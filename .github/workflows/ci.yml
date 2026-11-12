@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      # rustup is preinstalled; rust-toolchain.toml picks the version and components.
+      - name: Install Rust
+        run: rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --workspace --locked
+
+      - name: Release build
+        run: cargo build --release --locked -p pocketdeck-pc
+
+      - name: Upload program
+        uses: actions/upload-artifact@v7
+        with:
+          name: PocketDeck
+          path: target/release/PocketDeck.exe
+          retention-days: 14

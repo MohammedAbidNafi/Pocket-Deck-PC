@@ -1,0 +1,71 @@
+name: Bug report
+description: Something doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please search existing issues first. For security problems, use private reporting instead (see SECURITY.md). Problems in the phone app go to the PocketDeck repository.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Setup
+        - Streaming engine (Sunshine install, health checks)
+        - Game library / covers / sync to phone
+        - Pairing a phone / Devices
+        - Tray / start with Windows
+        - Settings / look
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PocketDeck for PC version
+      description: Settings → About.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+  - type: input
+    id: sunshine
+    attributes:
+      label: Sunshine version
+      description: Settings → Streaming host.
+      placeholder: "2026.914.233613"
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and PocketDeck version (if relevant)
+      placeholder: "Pixel 10, PocketDeck 0.4.0"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: PocketDeck's log is in %LOCALAPPDATA%\PocketDeck\logs. Sunshine's log helps for streaming problems.
+      render: text

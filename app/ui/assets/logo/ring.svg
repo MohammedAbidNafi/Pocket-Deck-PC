@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="14 14 80 80" width="320" height="320">
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="18" y1="12" x2="80" y2="104">
+      <stop offset="0" stop-color="#2A1488"/><stop offset="0.5" stop-color="#0C0926"/><stop offset="1" stop-color="#15127A"/>
+    </linearGradient>
+    <radialGradient id="bgCentre" gradientUnits="userSpaceOnUse" cx="54" cy="54" r="38">
+      <stop offset="0" stop-color="#070618" stop-opacity="0.9"/><stop offset="1" stop-color="#070618" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bgGlow" gradientUnits="userSpaceOnUse" cx="54" cy="92" r="24">
+      <stop offset="0" stop-color="#3A3BFF" stop-opacity="0.7"/><stop offset="1" stop-color="#3A3BFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ringGlow" gradientUnits="userSpaceOnUse" x1="54" y1="30" x2="54" y2="78">
+      <stop offset="0" stop-color="#B84DFF"/><stop offset="0.5" stop-color="#6A5CFF"/><stop offset="1" stop-color="#4DB0FF"/>
+    </linearGradient>
+    <linearGradient id="ring" gradientUnits="userSpaceOnUse" x1="54" y1="31" x2="54" y2="77">
+      <stop offset="0" stop-color="#B84DFF"/><stop offset="0.5" stop-color="#6A5CFF"/><stop offset="1" stop-color="#4DB0FF"/>
+    </linearGradient>
+    <linearGradient id="grip" gradientUnits="userSpaceOnUse" x1="54" y1="42.5" x2="54" y2="65">
+      <stop offset="0" stop-color="#F7F3FF"/><stop offset="1" stop-color="#B4A0FF"/>
+    </linearGradient>
+    <linearGradient id="droid" gradientUnits="userSpaceOnUse" x1="54" y1="49.2" x2="54" y2="56.5">
+      <stop offset="0" stop-color="#B892FF"/><stop offset="1" stop-color="#6C5CFF"/>
+    </linearGradient>
+    <clipPath id="ringCut"><path d="M0,0 H108 V41.3 H0 Z M0,65.8 H108 V108 H0 Z"/></clipPath>
+    <clipPath id="iconShape"><rect x="14" y="14" width="80" height="80" rx="18"/></clipPath>
+  </defs>
+  <!-- Ring, hidden where the grips cross it -->
+  <g clip-path="url(#ringCut)" fill="none">
+    <path d="M54,32.65 a21.35,21.35 0 1,1 0,42.7 a21.35,21.35 0 1,1 0,-42.7 Z" stroke="url(#ringGlow)" stroke-width="6.5" stroke-opacity="0.22"/>
+    <path d="M54,32.65 a21.35,21.35 0 1,1 0,42.7 a21.35,21.35 0 1,1 0,-42.7 Z" stroke="url(#ring)" stroke-width="3.1"/>
+  </g>
+</svg>

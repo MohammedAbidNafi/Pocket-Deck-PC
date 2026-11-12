@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/MohammedAbidNafi/Pocket-Deck-PC/security/advisories/new
+    about: Report security problems privately, not as a public issue.
+  - name: PocketDeck on your phone
+    url: https://github.com/MohammedAbidNafi/Pocket-Deck/issues
+    about: Problems in the Android app belong in its own repository.
+  - name: Sunshine (streaming host) problems
+    url: https://github.com/SunshineStream/Sunshine/issues
+    about: Issues with Sunshine itself belong in its own repository.

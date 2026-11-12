@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # Newer Slint needs a newer Rust than rust-toolchain.toml pins; move the two together by hand.
+      - dependency-name: "slint*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+    groups:
+      rust:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

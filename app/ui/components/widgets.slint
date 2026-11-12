@@ -1,0 +1,446 @@
+// Building blocks, same names and metrics as the phone's Widgets.kt, plus a few PC-only pieces.
+
+import { Palette, Theme, TitleText, BodyText, SmallText, LabelText, HeadlineText } from "../theme.slint";
+import { FocusCard, PopIn, RiseIn } from "focus.slint";
+export { PopIn, RiseIn }
+import { Icons } from "icons.slint";
+
+// Pill button.
+// Primary: accent gradient with a soft accent shadow. Secondary: a translucent pill with a hairline
+// edge that brightens on hover. Keyboard focus inverts to white, like controller focus on the phone.
+export component ConsoleButton inherits FocusCard {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> primary;
+    // 38px tall, for use inside rows.
+    in property <bool> compact;
+    property <color> fg: root.focused && !root.primary ? Palette.background : root.primary ? #ffffff : root.hovered ? Palette.text : Palette.text.with-alpha(0.92);
+
+    label: root.text;
+    corner: root.compact ? 19px : 23px;
+    focus-scale: 1.04;
+    hover-share: 0.6;
+    rest-shadow: root.primary ? Theme.accent.with-alpha(0.38) : transparent;
+    // Solid fills only: the software renderer paints gradients without rounded corners.
+    background: root.primary ? (root.hovered ? Theme.accent.brighter(0.18) : Theme.accent)
+        : root.focused ? #ffffff
+        : #ffffff.with-alpha(root.hovered ? 0.14 : 0.07);
+    animate background { duration: 150ms; }
+    border-width: 1px;
+    border-color: root.primary ? #ffffff.with-alpha(root.hovered ? 0.35 : 0.2) : #ffffff.with-alpha(root.hovered ? 0.24 : 0.11);
+    animate border-color { duration: 150ms; }
+
+    HorizontalLayout {
+        padding-top: root.compact ? 10px : 13px;
+        padding-bottom: root.compact ? 10px : 13px;
+        padding-left: root.icon.width > 0 ? (root.compact ? 14px : 18px) : (root.compact ? 16px : 22px);
+        padding-right: root.compact ? 16px : 22px;
+        spacing: root.compact ? 7px : 9px;
+
+        if root.icon.width > 0: Image {
+            source: root.icon;
+            width: root.compact ? 16px : 18px;
+            colorize: root.fg;
+            image-fit: contain;
+            animate colorize { duration: 120ms; }
+        }
+        Text {
+            text: root.text;
+            font-size: root.compact ? 13px : 15px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            color: root.fg;
+            vertical-alignment: center;
+            animate color { duration: 120ms; }
+        }
+    }
+}
+
+// Round icon-only button, as in the phone's top bar.
+export component IconPill inherits FocusCard {
+    in property <image> icon;
+    in property <bool> selected;
+    corner: 20px;
+    focus-scale: 1.1;
+    background: root.focused ? #ffffff : root.selected ? Theme.accent.with-alpha(0.28) : #ffffff.with-alpha(root.hovered ? 0.16 : 0.08);
+    animate background { duration: 150ms; }
+
+    VerticalLayout {
+        padding: 9px;
+        Image {
+            source: root.icon;
+            width: 22px;
+            height: 22px;
+            colorize: root.focused ? Palette.background : Palette.text;
+            // A little turn on hover.
+            transform-rotation: root.hovered ? 30deg : 0deg;
+            animate transform-rotation {
+                duration: 400ms;
+                easing: ease-out-back;
+            }
+        }
+    }
+}
+
+// Selectable chip (tile shape, tile size, filters).
+export component FilterChip inherits FocusCard {
+    in property <string> text;
+    in property <bool> selected;
+    in property <int> count: -1;
+    label: root.text;
+    corner: 18px;
+    focus-scale: 1.06;
+    click-sound: "toggle";
+    background: root.focused ? #ffffff : root.selected ? Theme.accent : #ffffff.with-alpha(root.hovered ? 0.14 : 0.07);
+    animate background { duration: 160ms; }
+
+    HorizontalLayout {
+        padding-top: 9px;
+        padding-bottom: 9px;
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: 8px;
+        Text {
+            text: root.text;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            color: root.focused ? Palette.background : Palette.text;
+            vertical-alignment: center;
+        }
+        if root.count >= 0: Text {
+            text: root.count;
+            font-size: 12px;
+            font-weight: 600;
+            color: (root.focused ? Palette.background : Palette.text).with-alpha(0.6);
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Round colour swatch for picking the accent (Swatch in LookStep.kt).
+export component Swatch inherits FocusCard {
+    in property <color> color;
+    in property <bool> selected;
+    corner: 22px;
+    focus-scale: 1.15;
+    glow-color: root.color;
+    click-sound: "toggle";
+
+    // A layout, so the card takes the circle's size.
+    VerticalLayout {
+        Rectangle {
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+            background: root.color;
+            border-width: 3px;
+            border-color: root.selected ? #ffffff : transparent;
+            if root.selected: PopIn {
+                width: 22px;
+                height: 22px;
+                Image {
+                    source: Icons.check;
+                    colorize: #ffffff;
+                }
+            }
+        }
+    }
+}
+
+export component Switch inherits Rectangle {
+    in property <bool> on;
+    width: 46px;
+    height: 26px;
+    border-radius: 13px;
+    background: root.on ? Theme.accent : #ffffff.with-alpha(0.15);
+    animate background { duration: 150ms; }
+    Rectangle {
+        x: root.on ? root.width - self.width - 3px : 3px;
+        y: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: #ffffff;
+        animate x {
+            duration: 260ms;
+            easing: ease-out-back;
+        }
+    }
+}
+
+// Full-width settings row with optional icon, subtitle, value and switch.
+export component SettingRow inherits FocusCard {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <string> value;
+    in property <image> icon;
+    in property <bool> has-toggle;
+    in property <bool> toggle-on;
+    in property <bool> danger;
+
+    label: root.title;
+    corner: 12px;
+    focus-scale: 1.015;
+    click-sound: root.has-toggle ? "toggle" : "select";
+    background: root.active ? Palette.surface-higher : Palette.surface.with-alpha(0.7);
+    animate background { duration: 120ms; }
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 20px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 16px;
+
+        if root.icon.width > 0: Image {
+            source: root.icon;
+            width: 24px;
+            colorize: root.danger ? Palette.danger : root.active ? Theme.accent : Palette.text-dim;
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            TitleText {
+                text: root.title;
+                color: root.danger ? Palette.danger : Palette.text;
+            }
+            if root.subtitle != "": SmallText {
+                text: root.subtitle;
+            }
+        }
+        if root.value != "": Text {
+            text: root.value;
+            font-size: 14px;
+            font-weight: 600;
+            color: root.active ? Palette.text : Palette.text-dim;
+            vertical-alignment: center;
+        }
+        if root.has-toggle: VerticalLayout {
+            alignment: center;
+            Switch {
+                on: root.toggle-on;
+            }
+        }
+    }
+}
+
+export component SectionHeader inherits LabelText {
+    // Text is passed already in capitals, as the phone shows it.
+    height: 46px;
+    vertical-alignment: bottom;
+    x: 4px;
+}
+
+// Small accent-tinted circle holding an icon (feature lists, cards).
+export component IconBadge inherits Rectangle {
+    in property <image> icon;
+    in property <color> tint: Theme.accent;
+    in property <length> size: 30px;
+    width: root.size;
+    height: root.size;
+    border-radius: root.size / 2;
+    background: root.tint.with-alpha(0.18);
+    Image {
+        source: root.icon;
+        width: root.size * 0.6;
+        height: root.size * 0.6;
+        colorize: root.tint;
+    }
+}
+
+// Turning arc, for anything still in progress.
+// (Transforms are ignored on a component's root element, so the image is a child.)
+export component Spinner {
+    in property <bool> spinning: true;
+    Image {
+        width: root.width;
+        height: root.height;
+        source: Icons.spinner;
+        colorize: Theme.accent;
+        transform-rotation: root.spinning ? 1deg * mod(animation-tick() / 1ms, 1100) * 360 / 1100 : 0deg;
+    }
+}
+
+export component ProgressBar {
+    // 0..1, or below 0 for a sweeping bar.
+    in property <float> value;
+    height: 6px;
+    min-width: 40px;
+    property <float> sweep: root.value >= 0 ? 0 : mod(animation-tick() / 1ms, 1400) / 1400;
+    // Clipping is ignored on a component's root, so the track is a child.
+    track := Rectangle {
+        width: root.width;
+        height: root.height;
+        border-radius: 3px;
+        background: Palette.surface-higher;
+        clip: true;
+        Rectangle {
+            x: root.value >= 0 ? 0px : (root.sweep * 1.4 - 0.4) * track.width;
+            y: 0px;
+            width: root.value >= 0 ? track.width * clamp(root.value, 0, 1) : track.width * 0.4;
+            height: track.height;
+            border-radius: 3px;
+            background: Theme.accent;
+        }
+    }
+}
+
+// One check in a list: a status badge, what it is, and a button to fix it when needed.
+// state: 0 checking, 1 fine, 2 needs attention, 3 working on it.
+export component StatusRow inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <int> state;
+    in property <string> action;
+    in property <image> action-icon;
+    in property <bool> action-primary: true;
+    in property <float> progress: -2;
+    // Lets a list of rows pop their badges one after another.
+    in property <duration> enter-delay: 0ms;
+    callback act();
+
+    border-radius: 12px;
+    background: Palette.surface.with-alpha(0.7);
+    accessible-role: groupbox;
+    accessible-label: root.title;
+    accessible-description: root.subtitle;
+
+    HorizontalLayout {
+        padding-left: 18px;
+        padding-right: 14px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 16px;
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                background: root.state == 1 ? Theme.accent.with-alpha(0.18) : root.state == 2 ? Palette.attention.with-alpha(0.16) : #ffffff.with-alpha(0.07);
+                animate background { duration: 200ms; }
+                if root.state == 1: PopIn {
+                    width: 20px;
+                    height: 20px;
+                    delay: root.enter-delay;
+                    Image {
+                        source: Icons.check;
+                        colorize: Theme.accent;
+                    }
+                }
+                if root.state == 2: PopIn {
+                    width: 19px;
+                    height: 19px;
+                    delay: root.enter-delay;
+                    Image {
+                        source: Icons.warning;
+                        colorize: Palette.attention;
+                    }
+                }
+                if root.state == 0 || root.state == 3: Spinner {
+                    width: 20px;
+                    height: 20px;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            horizontal-stretch: 1;
+            TitleText {
+                text: root.title;
+            }
+            if root.subtitle != "": SmallText {
+                text: root.subtitle;
+            }
+            if root.progress > -2: VerticalLayout {
+                padding-top: 6px;
+                ProgressBar {
+                    value: root.progress;
+                }
+            }
+        }
+        if root.action != "": VerticalLayout {
+            alignment: center;
+            ConsoleButton {
+                compact: true;
+                primary: root.action-primary;
+                text: root.action;
+                icon: root.action-icon;
+                clicked => {
+                    root.act();
+                }
+            }
+        }
+    }
+}
+
+// Big friendly placeholder for empty screens.
+export component EmptyState {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> body;
+    VerticalLayout {
+        alignment: center;
+        padding: 32px;
+        spacing: 0;
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 64px;
+                height: 64px;
+                colorize: Palette.text-faint;
+            }
+        }
+        Rectangle {
+            height: 16px;
+        }
+        Text {
+            text: root.title;
+            font-size: 24px;
+            font-weight: 700;
+            color: Palette.text;
+            horizontal-alignment: center;
+        }
+        Rectangle {
+            height: 6px;
+        }
+        HorizontalLayout {
+            alignment: center;
+            BodyText {
+                text: root.body;
+                max-width: 520px;
+                horizontal-alignment: center;
+            }
+        }
+        Rectangle {
+            height: 24px;
+        }
+        HorizontalLayout {
+            alignment: center;
+            spacing: 16px;
+            @children
+        }
+    }
+}
+
+// Setup progress (StepDots in OnboardingScreen.kt).
+export component StepDots {
+    in property <int> count;
+    in property <int> current;
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: center;
+        for i in root.count: Rectangle {
+            width: i == root.current ? 22px : 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: i == root.current ? Theme.accent : Palette.text-faint;
+            animate width, background { duration: 220ms; }
+        }
+    }
+}

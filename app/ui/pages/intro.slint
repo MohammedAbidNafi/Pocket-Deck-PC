@@ -1,0 +1,195 @@
+// Startup intro, ported from the phone's StartupIntro.kt with the same timings and springs:
+// the phone pops in, the neon ring sweeps round, the grips snap on from both sides and the
+// Android head bounces up, ending on exactly the logo. Click to skip.
+
+import { Motion } from "../theme.slint";
+
+export global LogoParts {
+    out property <image> ring: @image-url("../assets/logo/ring.svg");
+    out property <image> grip-left: @image-url("../assets/logo/grip-left.svg");
+    out property <image> grip-right: @image-url("../assets/logo/grip-right.svg");
+    out property <image> phone: @image-url("../assets/logo/phone.svg");
+    out property <image> droid: @image-url("../assets/logo/droid.svg");
+}
+
+// The logo ring on its 108-unit grid (drawn here in an 80-unit box starting at 14),
+// swept clockwise from the top up to `progress`.
+component RingSweep {
+    in property <float> progress;
+    in property <length> unit;
+    property <angle> a: 360deg * min(root.progress, 0.9999);
+    property <float> end-x: 54 + 21.35 * sin(root.a);
+    property <float> end-y: 54 - 21.35 * cos(root.a);
+    property <int> large: root.progress > 0.5 ? 1 : 0;
+    property <string> arc: "M 54 32.65 A 21.35 21.35 0 \{root.large} 1 \{root.end-x} \{root.end-y}";
+    // The ring's middle colour; the finished ring (an image) carries the full gradient.
+    property <brush> colours: #7E5CFF;
+
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-x: 14;
+        viewbox-y: 14;
+        viewbox-width: 80;
+        viewbox-height: 80;
+        commands: root.arc;
+        stroke: root.colours;
+        stroke-width: 6.5 * root.unit;
+        stroke-line-cap: round;
+        opacity: 0.22;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-x: 14;
+        viewbox-y: 14;
+        viewbox-width: 80;
+        viewbox-height: 80;
+        commands: root.arc;
+        stroke: root.colours;
+        stroke-width: 3.1 * root.unit;
+        stroke-line-cap: round;
+    }
+}
+
+export component Intro inherits Rectangle {
+    // Set once the sound is ready (or after a short wait), so sound and motion line up.
+    in property <bool> running;
+    // Playback speed; below 1 for slow motion while developing.
+    in property <float> speed: 1;
+    callback finished();
+
+    // Same as the phone's splash backdrop, so the hand-off looks the same.
+    background: #0B0820;
+
+    property <duration> start;
+    property <bool> done;
+    property <float> t: root.running ? (animation-tick() - root.start) / 1s * root.speed : 0;
+
+    changed running => {
+        if (root.running) {
+            root.start = animation-tick();
+        }
+    }
+
+    property <float> phone: Motion.spring(root.t, 0.62, 260);
+    property <float> ring: Motion.fast-out-slow-in((root.t - 0.12) / 0.7);
+    property <float> grips: Motion.spring(root.t - 0.36, 0.5, 340);
+    property <float> droid: Motion.spring(root.t - 0.76, 0.42, 380);
+    property <float> glow: root.t < 0.82 ? 0 : root.t < 1.08 ? (root.t - 0.82) / 0.26 : max(0.4, 1 - 0.6 * (root.t - 1.08) / 0.5);
+
+    property <length> logo: min(min(root.width, root.height) * 0.62, 320px);
+    // One unit of the logo's 80-unit box, in pixels.
+    property <length> unit: root.logo / 80;
+
+    opacity: root.done ? 0 : 1;
+    animate opacity {
+        duration: 320ms;
+        easing: ease-in;
+    }
+
+    // Ends ~0.2 s after the last part settles, like the phone.
+    Timer {
+        interval: 1900ms / root.speed;
+        running: root.running && !root.done;
+        triggered => {
+            root.done = true;
+        }
+    }
+    Timer {
+        interval: 340ms;
+        running: root.done;
+        triggered => {
+            self.running = false;
+            root.finished();
+        }
+    }
+
+    // Click to skip. Stops catching clicks the moment it starts fading, so it can never sit
+    // invisibly over the app.
+    TouchArea {
+        enabled: !root.done;
+        clicked => {
+            root.done = true;
+        }
+    }
+
+    box := Rectangle {
+        x: (root.width - root.logo) / 2;
+        y: (root.height - root.logo) / 2;
+        width: root.logo;
+        height: root.logo;
+
+        // Soft halo that brightens as the parts land.
+        Rectangle {
+            background: @radial-gradient(circle, #6A5CFF.with-alpha(0.12 * root.ring + 0.3 * root.glow) 0%, #6A5CFF.with-alpha(0) 59%);
+        }
+
+        // Ring sweep, hidden where the grips cross it (same cut as the icon).
+        if root.ring > 0.001 && root.ring < 0.999: Rectangle {
+            Rectangle {
+                y: 0;
+                height: box.height * 0.341;
+                clip: true;
+                RingSweep {
+                    y: 0;
+                    width: box.width;
+                    height: box.height;
+                    progress: root.ring;
+                    unit: root.unit;
+                }
+            }
+            Rectangle {
+                y: box.height * 0.6475;
+                height: box.height - self.y;
+                clip: true;
+                RingSweep {
+                    y: -box.height * 0.6475;
+                    width: box.width;
+                    height: box.height;
+                    progress: root.ring;
+                    unit: root.unit;
+                }
+            }
+        }
+        if root.ring >= 0.999: Image {
+            source: LogoParts.ring;
+            width: box.width;
+            height: box.height;
+        }
+
+        Image {
+            source: LogoParts.grip-left;
+            width: box.width;
+            height: box.height;
+            x: -(1 - root.grips) * root.logo * 0.38;
+            transform-rotation: -(1 - root.grips) * 14deg;
+            opacity: clamp(root.grips, 0, 1);
+        }
+        Image {
+            source: LogoParts.grip-right;
+            width: box.width;
+            height: box.height;
+            x: (1 - root.grips) * root.logo * 0.38;
+            transform-rotation: (1 - root.grips) * 14deg;
+            opacity: clamp(root.grips, 0, 1);
+        }
+        Image {
+            source: LogoParts.phone;
+            width: box.width;
+            height: box.height;
+            transform-scale: 0.55 + 0.45 * root.phone;
+            opacity: clamp(root.phone, 0, 1);
+        }
+        Image {
+            source: LogoParts.droid;
+            width: box.width;
+            height: box.height;
+            // Grows out of the head's flat base, like popping up from behind the screen.
+            transform-origin: { x: self.width / 2, y: self.height * 0.531 };
+            transform-scale: max(root.droid, 0);
+            y: (1 - root.droid) * box.height * 0.03;
+            opacity: clamp(root.droid, 0, 1);
+        }
+    }
+}

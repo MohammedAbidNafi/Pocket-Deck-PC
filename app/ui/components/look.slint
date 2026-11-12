@@ -1,0 +1,206 @@
+// Accent, tile shape and tile size pickers, and the live tile preview (LookStep.kt on the phone).
+// Every choice applies straight away; it is the real setting.
+
+import { Palette, Theme, TitleText, LabelText, SmallText } from "../theme.slint";
+import { App } from "../state.slint";
+import { FilterChip, Swatch } from "widgets.slint";
+import { Icons } from "icons.slint";
+
+component PickerLabel inherits VerticalLayout {
+    in property <string> text;
+    padding-top: 14px;
+    padding-bottom: 8px;
+    LabelText {
+        text: root.text;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+    }
+}
+
+export component LookControls inherits VerticalLayout {
+    spacing: 0;
+    PickerLabel {
+        text: "ACCENT COLOUR";
+    }
+    HorizontalLayout {
+        alignment: start;
+        spacing: 12px;
+        // Each card is wrapped: Slint drops transforms (the focus pop) on a repeated element's root.
+        for accent[i] in Theme.accents: VerticalLayout {
+            Swatch {
+                color: accent.color;
+                selected: i == Theme.accent-index;
+                label: accent.name;
+                clicked => {
+                    Theme.accent-index = i;
+                    App.look-changed();
+                }
+            }
+        }
+    }
+    PickerLabel {
+        text: "TILE SHAPE";
+    }
+    HorizontalLayout {
+        alignment: start;
+        spacing: 10px;
+        for name[i] in ["Round", "Square", "Rectangle"]: VerticalLayout {
+            FilterChip {
+                text: name;
+                selected: Theme.tile-shape == i;
+                clicked => {
+                    Theme.tile-shape = i;
+                    App.look-changed();
+                }
+            }
+        }
+    }
+    PickerLabel {
+        text: "TILE SIZE";
+    }
+    HorizontalLayout {
+        alignment: start;
+        spacing: 10px;
+        for name[i] in ["Small", "Medium", "Large"]: VerticalLayout {
+            FilterChip {
+                text: name;
+                selected: Theme.tile-size == i;
+                clicked => {
+                    Theme.tile-size = i;
+                    App.look-changed();
+                }
+            }
+        }
+    }
+}
+
+// A game tile drawn as if selected (accent glow and white ring), in the current shape and size.
+export component TilePreview inherits Rectangle {
+    // Largest the tile may be drawn; it shrinks proportionally to fit.
+    in property <length> max-tile-height: 150px;
+    in property <string> title: "Your game";
+
+    property <bool> round: Theme.tile-shape == 0;
+    property <length> full-w: Theme.tile-shape == 2 ? Theme.wide-width : Theme.wide-height;
+    property <length> full-h: Theme.wide-height;
+    property <float> fit: min(1, root.max-tile-height / root.full-h);
+    property <length> tile-w: root.full-w * root.fit;
+    property <length> tile-h: root.full-h * root.fit;
+
+    min-height: root.max-tile-height + 50px;
+
+    tile := Rectangle {
+        x: root.round ? (root.width - self.width) / 2 : 10px;
+        y: 10px;
+        width: root.tile-w;
+        height: root.tile-h;
+        animate width, height, x {
+            duration: 300ms;
+            easing: ease-out-back;
+        }
+
+        property <length> corner: root.round ? self.width / 2 : 14px;
+
+        // Glow
+        Rectangle {
+            border-radius: tile.corner;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: Theme.accent.with-alpha(0.55);
+        }
+        // Art (a placeholder until the library lands)
+        Rectangle {
+            clip: true;
+            border-radius: tile.corner;
+            // Solid: the software renderer draws gradients without rounded corners.
+            background: Theme.accent.mix(Palette.surface-high, 0.4);
+            Image {
+                source: Icons.games;
+                width: min(parent.width, parent.height) * 0.36;
+                height: self.width;
+                colorize: #ffffff.with-alpha(0.85);
+            }
+        }
+        // Ring
+        Rectangle {
+            x: -3px;
+            y: -3px;
+            width: parent.width + 6px;
+            height: parent.height + 6px;
+            border-radius: tile.corner + 3px;
+            border-width: 3px;
+            border-color: #ffffff;
+        }
+    }
+
+    Text {
+        x: root.round ? (root.width - self.width) / 2 : 10px;
+        y: tile.y + tile.height + 12px;
+        text: root.title;
+        font-size: 14px;
+        font-weight: 600;
+        color: Palette.text;
+    }
+}
+
+// The right-hand panel of the Look step: a little mock of the Home screen.
+export component PreviewPanel inherits Rectangle {
+    border-radius: 26px;
+    background: Palette.surface.with-alpha(0.85);
+    border-width: 1px;
+    border-color: Theme.accent.with-alpha(0.35);
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 0;
+        LabelText {
+            text: "PREVIEW";
+            color: Theme.accent;
+        }
+        Rectangle {
+            height: 10px;
+        }
+        HorizontalLayout {
+            TitleText {
+                text: "Continue playing";
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+            }
+            // Accent Play pill, like on a game's page.
+            Rectangle {
+                border-radius: self.height / 2;
+                background: Theme.accent;
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    padding-top: 6px;
+                    padding-bottom: 6px;
+                    spacing: 4px;
+                    Image {
+                        source: Icons.play;
+                        width: 16px;
+                        colorize: #ffffff;
+                    }
+                    Text {
+                        text: "Play";
+                        font-size: 14px;
+                        font-weight: 700;
+                        color: #ffffff;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+        Rectangle {
+            height: 8px;
+        }
+        TilePreview { }
+        Rectangle {
+            vertical-stretch: 1;
+        }
+        HorizontalLayout {
+            alignment: end;
+            @children
+        }
+    }
+}

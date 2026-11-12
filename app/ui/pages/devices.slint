@@ -1,0 +1,288 @@
+// Devices: pair a phone by scanning a code, and the phones already paired.
+
+import { ScrollView } from "std-widgets.slint";
+import { Palette, Theme, PageTitle, HeadlineText, TitleText, BodyText, SmallText, LabelText } from "../theme.slint";
+import { Pairing } from "../state.slint";
+import { ConsoleButton, IconBadge, PopIn, RiseIn, SectionHeader, Spinner } from "../components/widgets.slint";
+import { Icons } from "../components/icons.slint";
+
+// The code and what to do with it, through every step of a pairing.
+component PairPanel inherits Rectangle {
+    property <string> state: Pairing.state;
+    property <bool> live: root.state == "showing" || root.state == "pairing";
+    property <int> mins: floor(Pairing.seconds-left / 60);
+    property <int> secs: mod(Pairing.seconds-left, 60);
+
+    border-radius: 26px;
+    background: Palette.surface.with-alpha(0.9);
+    border-width: 1px;
+    border-color: root.state == "failed" ? Palette.danger.with-alpha(0.4) : Theme.accent.with-alpha(0.35);
+    animate border-color { duration: 200ms; }
+
+    HorizontalLayout {
+        padding: 28px;
+        spacing: 32px;
+
+        // The code sits on white in every theme, so any phone camera reads it.
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 252px;
+                height: 252px;
+                border-radius: 20px;
+                background: root.live ? #ffffff : Palette.surface-high;
+                animate background { duration: 200ms; }
+
+                // Opacity is dropped on the root of an `if`, so the image sits in a wrapper.
+                if root.live: Rectangle {
+                    width: 232px;
+                    height: 232px;
+                    Image {
+                        source: Pairing.code;
+                        width: parent.width;
+                        height: parent.height;
+                        image-rendering: pixelated;
+                        opacity: root.state == "pairing" ? 0.15 : 1;
+                        animate opacity { duration: 200ms; }
+                    }
+                }
+                if root.state == "preparing" || root.state == "pairing": Spinner {
+                    width: 44px;
+                    height: 44px;
+                }
+                if root.state == "paired": PopIn {
+                    IconBadge {
+                        icon: Icons.check;
+                        size: 84px;
+                    }
+                }
+                if root.state == "failed": IconBadge {
+                    icon: Icons.warning;
+                    tint: Palette.danger;
+                    size: 84px;
+                }
+                if root.state == "expired": IconBadge {
+                    icon: Icons.refresh;
+                    tint: Palette.text-dim;
+                    size: 84px;
+                }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 10px;
+            LabelText {
+                text: "PAIR A PHONE";
+                font-weight: 700;
+                color: Theme.accent;
+            }
+            HeadlineText {
+                text: root.state == "preparing" ? "Getting a code ready…"
+                    : root.state == "showing" ? "Scan this with PocketDeck on your phone"
+                    : root.state == "pairing" ? "Pairing with your phone…"
+                    : root.state == "paired" ? "Your phone is paired"
+                    : root.state == "failed" ? "Pairing didn't work"
+                    : "This code expired";
+            }
+            BodyText {
+                text: root.state == "preparing" ? "One moment."
+                    : root.state == "showing" ? "On your phone, open PocketDeck, go to Settings, PC streaming, and tap Scan PC's code. Your phone needs to be on the same network as this PC."
+                    : root.state == "pairing" ? "Keep PocketDeck open on your phone for a moment."
+                    : root.state == "paired" ? "It's listed below as \{Pairing.message}. Your games are on their way to it."
+                    : root.state == "failed" ? Pairing.message
+                    : "A code only works for two minutes. Show a new one and scan that.";
+            }
+            if root.state == "showing": SmallText {
+                text: "Code works for \{root.mins}:\{root.secs < 10 ? "0" : ""}\{root.secs}" + (Pairing.pc-name != "" ? "  ·  Pairs with \{Pairing.pc-name}" : "");
+                font-size: 13px;
+            }
+            Rectangle {
+                height: 6px;
+            }
+            HorizontalLayout {
+                alignment: start;
+                spacing: 12px;
+                if root.state == "paired": ConsoleButton {
+                    text: "Done";
+                    primary: true;
+                    clicked => {
+                        Pairing.stop();
+                    }
+                }
+                if root.state == "failed" || root.state == "expired": ConsoleButton {
+                    text: "Show a new code";
+                    icon: Icons.refresh;
+                    primary: true;
+                    clicked => {
+                        Pairing.start();
+                    }
+                }
+                if root.state == "showing": ConsoleButton {
+                    text: "New code";
+                    icon: Icons.refresh;
+                    clicked => {
+                        Pairing.start();
+                    }
+                }
+                if root.state != "paired": ConsoleButton {
+                    text: root.state == "pairing" ? "Cancel" : "Close";
+                    click-sound: "back";
+                    clicked => {
+                        Pairing.stop();
+                    }
+                }
+            }
+        }
+    }
+}
+
+// One paired phone. Unpairing asks once more before it happens.
+component DeviceRow inherits Rectangle {
+    in property <string> name;
+    callback unpair();
+    property <bool> confirming;
+
+    border-radius: 12px;
+    background: Palette.surface.with-alpha(0.7);
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 14px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        spacing: 16px;
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: Icons.phone;
+                width: 24px;
+                colorize: Palette.text-dim;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            TitleText {
+                text: root.name != "" ? root.name : "Unnamed device";
+            }
+            SmallText {
+                text: root.confirming ? "It will need to pair again before it can stream." : "Can stream from this PC.";
+                color: root.confirming ? Palette.attention : Palette.text-dim;
+            }
+        }
+        if root.confirming: VerticalLayout {
+            alignment: center;
+            ConsoleButton {
+                text: "Keep";
+                compact: true;
+                click-sound: "back";
+                clicked => {
+                    root.confirming = false;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            ConsoleButton {
+                text: root.confirming ? "Unpair now" : "Unpair";
+                compact: true;
+                clicked => {
+                    if root.confirming {
+                        root.confirming = false;
+                        root.unpair();
+                    } else {
+                        root.confirming = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component DevicesContent inherits Rectangle {
+    init => {
+        Pairing.load-devices();
+    }
+
+    ScrollView {
+        HorizontalLayout {
+            alignment: center;
+            padding-left: Theme.screen-padding;
+            padding-right: Theme.screen-padding;
+            VerticalLayout {
+                max-width: 980px;
+                alignment: start;
+                padding-top: 8px;
+                padding-bottom: 40px;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    spacing: 24px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 4px;
+                        PageTitle {
+                            text: "Devices";
+                        }
+                        BodyText {
+                            text: "Phones that can stream from this PC. Pair one by scanning a code, no PIN to type.";
+                        }
+                    }
+                    if Pairing.state == "idle": VerticalLayout {
+                        alignment: center;
+                        ConsoleButton {
+                            text: "Pair a phone";
+                            icon: Icons.qr;
+                            primary: true;
+                            clicked => {
+                                Pairing.start();
+                            }
+                        }
+                    }
+                }
+
+                if Pairing.state != "idle": RiseIn {
+                    PairPanel { }
+                }
+
+                SectionHeader {
+                    text: "PAIRED PHONES";
+                }
+                if !Pairing.devices-loaded: SmallText {
+                    text: "Checking…";
+                    font-size: 14px;
+                }
+                if Pairing.devices-loaded && Pairing.devices-error != "": BodyText {
+                    text: Pairing.devices-error;
+                    font-size: 14px;
+                }
+                if Pairing.devices-loaded && Pairing.devices-error == "" && Pairing.devices.length == 0: Rectangle {
+                    border-radius: 12px;
+                    background: Palette.surface.with-alpha(0.7);
+                    HorizontalLayout {
+                        padding: 20px;
+                        spacing: 16px;
+                        Image {
+                            source: Icons.phone;
+                            width: 24px;
+                            colorize: Palette.text-faint;
+                        }
+                        BodyText {
+                            horizontal-stretch: 1;
+                            text: "No phones paired yet. Press Pair a phone, then scan the code with PocketDeck on your phone.";
+                            font-size: 14px;
+                        }
+                    }
+                }
+                for d in Pairing.devices: DeviceRow {
+                    name: d.name;
+                    unpair => {
+                        Pairing.unpair(d.uuid);
+                    }
+                }
+            }
+        }
+    }
+}

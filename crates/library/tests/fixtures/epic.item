@@ -1,0 +1,29 @@
+{
+	"FormatVersion": 0,
+	"bIsIncompleteInstall": false,
+	"LaunchCommand": "",
+	"LaunchExecutable": "MarsEpic.exe",
+	"ManifestLocation": "C:\\ProgramData/Epic/EpicGamesLauncher/Data/Manifests",
+	"bIsApplication": true,
+	"bIsExecutable": true,
+	"bIsManaged": false,
+	"bNeedsValidation": false,
+	"bRequiresAuth": true,
+	"bCanRunOffline": true,
+	"AppName": "Ovenbird",
+	"BaseURLs": [],
+	"BuildLabel": "Live",
+	"CatalogItemId": "20729b9176c241f0b617c5723e70ec2d",
+	"CatalogNamespace": "d759128018124dcabb1fbee9bb28e178",
+	"AppCategories": [
+		"public",
+		"games",
+		"applications"
+	],
+	"DisplayName": "Surviving Mars",
+	"InstallLocation": "C:\\Program Files\\Epic Games\\SurvivingMars",
+	"InstallSize": 6000000000,
+	"MainGameAppName": "Ovenbird",
+	"MainGameCatalogItemId": "20729b9176c241f0b617c5723e70ec2d",
+	"MainGameCatalogNamespace": "d759128018124dcabb1fbee9bb28e178"
+}

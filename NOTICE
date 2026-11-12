@@ -1,0 +1,43 @@
+PocketDeck for PC
+Copyright (C) 2026 Abid Nafi
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, version 3 of the
+License. See LICENSE.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+------------------------------------------------------------------------------------------------
+Third-party components
+------------------------------------------------------------------------------------------------
+
+  Slint (UI toolkit, used under its GPL-3.0 option)   GPL-3.0      Slint Developers
+      https://github.com/slint-ui/slint
+  tray-icon                                           MIT / Apache-2.0   Tauri Programme within The Commons Conservancy
+  ureq                                                MIT / Apache-2.0   Martin Algesten and contributors
+  rustls                                              Apache-2.0 / ISC / MIT   rustls contributors
+  ring                                                Apache-2.0 AND ISC   Brian Smith and contributors
+  serde, serde_json                                   MIT / Apache-2.0   serde contributors
+  sha2                                                MIT / Apache-2.0   RustCrypto developers
+  qrcode                                              MIT / Apache-2.0   kennytm and contributors
+  image                                               MIT / Apache-2.0   image-rs contributors
+  windows-sys                                         MIT / Apache-2.0   Microsoft
+  windows-service                                     MIT / Apache-2.0   Mullvad VPN
+  winreg                                              MIT                Igor Shaula
+  winresource                                         MIT                Max Resch
+  raw-window-handle                                   MIT / Apache-2.0 / Zlib   Osspial and contributors
+  resvg, ico (build tools only, not shipped)          Apache-2.0 / MIT, MIT   their contributors
+
+The full list of Rust crates is in Cargo.lock (`cargo metadata` shows each licence). All are
+GPLv3-compatible: MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0, Unicode-3.0 and similar.
+
+Not included:
+
+  Sunshine (https://github.com/SunshineStream/Sunshine), the streaming host. PocketDeck uses an
+  existing install, or downloads the official, checksum-pinned installer when the person asks it to.
+  ViGEmBus (https://github.com/nefarius/ViGEmBus), the virtual controller driver Sunshine uses.
+
+Steam, Epic Games and GOG are trademarks of their respective owners. NVIDIA GameStream is a
+trademark of NVIDIA Corporation. PocketDeck is not affiliated with any of them, nor with
+LizardByte or the Moonlight project.

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="14 14 80 80" width="320" height="320">
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="18" y1="12" x2="80" y2="104">
+      <stop offset="0" stop-color="#2A1488"/><stop offset="0.5" stop-color="#0C0926"/><stop offset="1" stop-color="#15127A"/>
+    </linearGradient>
+    <radialGradient id="bgCentre" gradientUnits="userSpaceOnUse" cx="54" cy="54" r="38">
+      <stop offset="0" stop-color="#070618" stop-opacity="0.9"/><stop offset="1" stop-color="#070618" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bgGlow" gradientUnits="userSpaceOnUse" cx="54" cy="92" r="24">
+      <stop offset="0" stop-color="#3A3BFF" stop-opacity="0.7"/><stop offset="1" stop-color="#3A3BFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ringGlow" gradientUnits="userSpaceOnUse" x1="54" y1="30" x2="54" y2="78">
+      <stop offset="0" stop-color="#B84DFF"/><stop offset="0.5" stop-color="#6A5CFF"/><stop offset="1" stop-color="#4DB0FF"/>
+    </linearGradient>
+    <linearGradient id="ring" gradientUnits="userSpaceOnUse" x1="54" y1="31" x2="54" y2="77">
+      <stop offset="0" stop-color="#B84DFF"/><stop offset="0.5" stop-color="#6A5CFF"/><stop offset="1" stop-color="#4DB0FF"/>
+    </linearGradient>
+    <linearGradient id="grip" gradientUnits="userSpaceOnUse" x1="54" y1="42.5" x2="54" y2="65">
+      <stop offset="0" stop-color="#F7F3FF"/><stop offset="1" stop-color="#B4A0FF"/>
+    </linearGradient>
+    <linearGradient id="droid" gradientUnits="userSpaceOnUse" x1="54" y1="49.2" x2="54" y2="56.5">
+      <stop offset="0" stop-color="#B892FF"/><stop offset="1" stop-color="#6C5CFF"/>
+    </linearGradient>
+    <clipPath id="ringCut"><path d="M0,0 H108 V41.3 H0 Z M0,65.8 H108 V108 H0 Z"/></clipPath>
+    <clipPath id="iconShape"><rect x="14" y="14" width="80" height="80" rx="18"/></clipPath>
+  </defs>
+  <!-- Right grip + face buttons -->
+  <path fill="url(#grip)" d="M68.7,43.6 L72.4,43.1 C76.7,42.7 78.9,44.7 80.2,47.2 L83.0,54 C84.5,58.3 83.6,63.9 78.9,64.7 C77.4,64.9 76.1,64.5 74.9,64.0 L68.6,61.3 Z"/>
+  <path fill="#0B0820" d="M74.4,49.2 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 Z M74.4,54.8 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 Z M71.6,52 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 Z M77.2,52 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 Z"/>
+</svg>

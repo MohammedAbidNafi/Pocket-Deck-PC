@@ -1,0 +1,30 @@
+import { Palette, Theme, Type } from "theme.slint";
+import { App, Engine, EngineStatus, Task, Sfx, Library, GameItem, SourceItem, Pairing, PairedDevice } from "state.slint";
+import { Onboarding } from "pages/onboarding.slint";
+import { MainShell } from "pages/shell.slint";
+import { Intro } from "pages/intro.slint";
+
+// Re-exported so the Rust side can reach them.
+export { Palette, Theme, App, Engine, EngineStatus, Task, Sfx, Library, GameItem, SourceItem, Pairing, PairedDevice }
+
+export component AppWindow inherits Window {
+    title: "PocketDeck";
+    icon: @image-url("../assets/logo-512.png");
+    preferred-width: 1180px;
+    preferred-height: 760px;
+    min-width: 960px;
+    min-height: 640px;
+    background: Palette.background;
+    default-font-family: Type.text-family;
+
+    if App.onboarding: Onboarding { }
+    if !App.onboarding: MainShell { }
+
+    if App.show-intro: Intro {
+        running: App.intro-running;
+        speed: App.intro-speed;
+        finished => {
+            App.show-intro = false;
+        }
+    }
+}

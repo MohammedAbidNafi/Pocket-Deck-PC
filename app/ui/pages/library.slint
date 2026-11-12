@@ -1,0 +1,242 @@
+// The game library: everything PocketDeck found on this PC, and whether it goes to the phone.
+
+import { LineEdit, ScrollView } from "std-widgets.slint";
+import { Palette, Theme, PageTitle, TitleText, BodyText, SmallText } from "../theme.slint";
+import { Library } from "../state.slint";
+import { ConsoleButton, EmptyState, FilterChip, IconBadge, ProgressBar, RiseIn, Spinner } from "../components/widgets.slint";
+import { GameTile, TileMetrics } from "../components/tiles.slint";
+import { Icons } from "../components/icons.slint";
+
+// Shown when Sunshine has a web login PocketDeck doesn't know yet.
+export component ConnectCard inherits Rectangle {
+    border-radius: 22px;
+    background: Palette.surface.with-alpha(0.9);
+    border-width: 1px;
+    border-color: Theme.accent.with-alpha(0.35);
+
+    VerticalLayout {
+        padding: 22px;
+        spacing: 14px;
+        HorizontalLayout {
+            spacing: 14px;
+            VerticalLayout {
+                alignment: start;
+                IconBadge {
+                    icon: Icons.lock;
+                    size: 40px;
+                }
+            }
+            VerticalLayout {
+                spacing: 4px;
+                Text {
+                    text: "Connect to Sunshine";
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: Palette.text;
+                }
+                BodyText {
+                    font-size: 14px;
+                    text: "Sunshine on this PC already has a web login. Enter it once so PocketDeck can add your games, or let PocketDeck set a new one for you.";
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 12px;
+            user := LineEdit {
+                placeholder-text: "Sunshine username";
+                horizontal-stretch: 1;
+            }
+            pass := LineEdit {
+                placeholder-text: "Password";
+                input-type: password;
+                horizontal-stretch: 1;
+                accepted => {
+                    Library.login(user.text, pass.text);
+                }
+            }
+            ConsoleButton {
+                compact: true;
+                primary: true;
+                text: "Connect";
+                enabled: !Library.busy && user.text != "" && pass.text != "";
+                clicked => {
+                    Library.login(user.text, pass.text);
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 12px;
+            ConsoleButton {
+                compact: true;
+                text: "Reset it for me";
+                icon: Icons.wrench;
+                enabled: !Library.busy;
+                clicked => {
+                    Library.reset-login();
+                }
+            }
+            SmallText {
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                text: "Gives Sunshine a new web login that PocketDeck keeps for you. Windows asks for permission.";
+            }
+        }
+        if Library.error != "": Text {
+            text: Library.error;
+            font-size: 13px;
+            color: Palette.danger;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// A Rectangle so it fills the page (a bare component would shrink to its contents).
+export component LibraryContent inherits Rectangle {
+    property <length> gap: 22px;
+    property <int> cols: max(1, floor((grid.width + root.gap) / (TileMetrics.width + root.gap)));
+    property <int> rows: ceil(Library.games.length / root.cols);
+
+    ScrollView {
+        VerticalLayout {
+            padding-left: Theme.screen-padding;
+            padding-right: Theme.screen-padding;
+            padding-top: 8px;
+            padding-bottom: 32px;
+            spacing: 16px;
+            // Keep everything packed at the top on tall windows (no stretched rows).
+            alignment: start;
+
+            HorizontalLayout {
+                spacing: 16px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    PageTitle {
+                        text: "Your games";
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        if Library.busy: VerticalLayout {
+                            alignment: center;
+                            Spinner {
+                                width: 16px;
+                                height: 16px;
+                            }
+                        }
+                        BodyText {
+                            font-size: 14px;
+                            text: Library.message;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        ConsoleButton {
+                            text: "Scan again";
+                            icon: Icons.refresh;
+                            enabled: !Library.busy;
+                            clicked => {
+                                Library.refresh();
+                            }
+                        }
+                        ConsoleButton {
+                            text: "Add a game";
+                            icon: Icons.plus;
+                            primary: true;
+                            clicked => {
+                                Library.add-game();
+                            }
+                        }
+                    }
+                }
+            }
+
+            if Library.busy && Library.games.length > 0: ProgressBar {
+                value: Library.progress;
+            }
+
+            if Library.access == "needs-login": RiseIn {
+                ConnectCard { }
+            }
+
+            // Nothing to show yet: a proper progress panel instead of an empty page.
+            if Library.busy && Library.games.length == 0: RiseIn {
+                HorizontalLayout {
+                    alignment: center;
+                    padding-top: 60px;
+                    VerticalLayout {
+                        width: 360px;
+                        spacing: 14px;
+                        HorizontalLayout {
+                            alignment: center;
+                            Spinner {
+                                width: 44px;
+                                height: 44px;
+                            }
+                        }
+                        Text {
+                            text: Library.message;
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: Palette.text;
+                            horizontal-alignment: center;
+                        }
+                        ProgressBar {
+                            value: Library.progress;
+                        }
+                        SmallText {
+                            text: "Checking Steam, Epic Games and GOG on this PC.";
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            if Library.filters.length > 2: HorizontalLayout {
+                alignment: start;
+                spacing: 10px;
+                for f in Library.filters: VerticalLayout {
+                    FilterChip {
+                        text: f.label;
+                        count: f.count;
+                        selected: Library.filter == f.id;
+                        clicked => {
+                            Library.filter = f.id;
+                            Library.filter-changed();
+                        }
+                    }
+                }
+            }
+
+            grid := Rectangle {
+                height: root.rows * (TileMetrics.height + TileMetrics.caption + root.gap);
+                for game[i] in Library.games: Rectangle {
+                    x: mod(i, root.cols) * (TileMetrics.width + root.gap);
+                    y: floor(i / root.cols) * (TileMetrics.height + TileMetrics.caption + root.gap);
+                    width: TileMetrics.width;
+                    height: TileMetrics.height + TileMetrics.caption;
+                    GameTile {
+                        game: game;
+                        toggled => {
+                            Library.toggle-game(game.key);
+                        }
+                    }
+                }
+            }
+
+            if Library.games.length == 0 && !Library.busy: EmptyState {
+                icon: Icons.games;
+                title: "No games found yet";
+                body: "PocketDeck looks for Steam, Epic Games and GOG games. Install one, press Scan again, or add any game yourself.";
+            }
+
+            if Library.games.length > 0: SmallText {
+                text: "Click a game to hide it from your phone, or to bring it back. Games you add here appear on your phone after it refreshes its PC list.";
+                color: Palette.text-faint;
+            }
+        }
+    }
+}

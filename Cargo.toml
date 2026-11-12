@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = ["app", "crates/core", "crates/library", "crates/sunshine", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "GPL-3.0-only"
+authors = ["Mohammed Abid Nafi"]
+repository = "https://github.com/MohammedAbidNafi/Pocket-Deck-PC"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

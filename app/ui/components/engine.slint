@@ -1,0 +1,156 @@
+// The streaming engine checks, shown in setup and on Home: installed, running, controller,
+// answering. Called "Sunshine" only for people who installed Sunshine themselves.
+
+import { Palette, Theme } from "../theme.slint";
+import { Engine } from "../state.slint";
+import { StatusRow, RiseIn } from "widgets.slint";
+import { Icons } from "icons.slint";
+
+export component CheckInstalled inherits StatusRow {
+    property <bool> checked: Engine.status.checked;
+    property <bool> installed: Engine.status.installed;
+    property <bool> own: Engine.own-sunshine;
+    property <bool> installing: Engine.task.active && Engine.task.kind == "install";
+    property <bool> restarting: Engine.task.active && Engine.task.kind == "restart";
+
+        state: root.installing ? 3 : !root.checked ? 0 : root.installed && !Engine.status.outdated ? 1 : 2;
+            title: root.installing ? "Setting up the streaming engine"
+            : !root.checked ? "Checking this PC…"
+            : !root.installed ? "Streaming engine isn't set up yet"
+            : Engine.status.outdated ? "\{Engine.name} needs an update"
+            : root.own ? (Engine.status.version != "" ? "Sunshine \{Engine.status.version}" : "Sunshine")
+            : "Streaming engine is ready";
+        subtitle: root.installing ? Engine.task.label
+            : Engine.task.error != "" && Engine.task.kind == "install" ? Engine.task.error
+            : !root.checked ? ""
+            : !root.installed ? "PocketDeck needs its free streaming engine to send games to your phone. It downloads and sets itself up in a minute or two."
+            : Engine.status.outdated ? "Update it so everything works."
+            : root.own ? "Found at \{Engine.status.location}. PocketDeck will use it."
+            : "Set up by PocketDeck.";
+        progress: root.installing ? Engine.task.progress : -2;
+        action: root.installing || Engine.task.active || !root.checked ? "" : !root.installed ? "Set up" : Engine.status.outdated ? "Update" : "";
+        action-icon: Icons.download;
+        act => {
+            Engine.install();
+        }
+}
+
+export component CheckRunning inherits StatusRow {
+    property <bool> checked: Engine.status.checked;
+    property <bool> installed: Engine.status.installed;
+    property <bool> own: Engine.own-sunshine;
+    property <bool> installing: Engine.task.active && Engine.task.kind == "install";
+    property <bool> restarting: Engine.task.active && Engine.task.kind == "restart";
+
+        state: !root.checked ? 0 : root.restarting || Engine.status.changing ? 3 : Engine.status.running ? 1 : 2;
+            title: root.restarting ? "Starting \{Engine.name-lower}…" : Engine.status.running ? "\{Engine.name} is running" : "\{Engine.name} isn't running";
+        subtitle: !root.checked ? ""
+            : Engine.task.error != "" && Engine.task.kind == "restart" ? Engine.task.error
+            : !root.installed ? "Set it up first."
+            : Engine.status.running ? "It starts with Windows, so your phone can connect any time."
+            : "Starting it asks for administrator permission.";
+        action: root.checked && root.installed && !Engine.status.running && !Engine.task.active ? "Start" : "";
+        action-icon: Icons.power;
+        act => {
+            Engine.restart();
+        }
+}
+
+export component CheckController inherits StatusRow {
+    property <bool> checked: Engine.status.checked;
+    property <bool> installed: Engine.status.installed;
+    property <bool> own: Engine.own-sunshine;
+    property <bool> installing: Engine.task.active && Engine.task.kind == "install";
+    property <bool> restarting: Engine.task.active && Engine.task.kind == "restart";
+
+        state: !root.checked ? 0 : Engine.status.controller ? 1 : 2;
+            title: Engine.status.controller ? "Controller support is ready" : "Controller driver is missing";
+        subtitle: !root.checked ? "" : Engine.status.controller ? "Your phone's controller shows up on the PC as an Xbox controller." : "Install the ViGEmBus driver so games can see your phone's controller.";
+        action: root.checked && !Engine.status.controller ? "Get driver" : "";
+        action-icon: Icons.external;
+        action-primary: false;
+        act => {
+            Engine.open-driver-page();
+        }
+}
+
+export component CheckAnswering inherits StatusRow {
+    property <bool> checked: Engine.status.checked;
+    property <bool> installed: Engine.status.installed;
+    property <bool> own: Engine.own-sunshine;
+    property <bool> installing: Engine.task.active && Engine.task.kind == "install";
+    property <bool> restarting: Engine.task.active && Engine.task.kind == "restart";
+
+        state: !root.checked ? 0 : Engine.status.answering ? 1 : root.restarting ? 3 : 2;
+            title: Engine.status.answering ? (Engine.status.busy ? "Streaming right now" : "Ready for your phone") : "Not ready for your phone yet";
+        subtitle: !root.checked ? ""
+            : Engine.status.answering ? "Your phone can find this PC as \{Engine.status.host-name}."
+            : Engine.status.running ? "\{Engine.name} is running but not answering. It may still be starting; if this stays, restart it."
+            : "\{Engine.name} needs to be set up and running.";
+        action: root.checked && Engine.status.running && !Engine.status.answering && !Engine.task.active ? "Restart" : "";
+        action-icon: Icons.refresh;
+        action-primary: false;
+        act => {
+            Engine.restart();
+        }
+}
+
+// The four checks stacked (setup).
+export component EngineChecks inherits VerticalLayout {
+    spacing: 10px;
+    RiseIn {
+        CheckInstalled {
+            enter-delay: 120ms;
+        }
+    }
+    RiseIn {
+        delay: 70ms;
+        CheckRunning {
+            enter-delay: 190ms;
+        }
+    }
+    RiseIn {
+        delay: 140ms;
+        CheckController {
+            enter-delay: 260ms;
+        }
+    }
+    RiseIn {
+        delay: 210ms;
+        CheckAnswering {
+            enter-delay: 330ms;
+        }
+    }
+}
+
+// The four checks in two columns (Home, on wide windows).
+export component EngineGrid inherits GridLayout {
+    spacing: 10px;
+    Row {
+        RiseIn {
+            CheckInstalled {
+                enter-delay: 120ms;
+            }
+        }
+        RiseIn {
+            delay: 70ms;
+            CheckRunning {
+                enter-delay: 190ms;
+            }
+        }
+    }
+    Row {
+        RiseIn {
+            delay: 140ms;
+            CheckController {
+                enter-delay: 260ms;
+            }
+        }
+        RiseIn {
+            delay: 210ms;
+            CheckAnswering {
+                enter-delay: 330ms;
+            }
+        }
+    }
+}

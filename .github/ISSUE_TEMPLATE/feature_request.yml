@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an idea or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The problem or use case, rather than a specific solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could PocketDeck help?
+      description: Your idea for how it could work, on the PC and on the phone.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds

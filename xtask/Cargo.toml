@@ -1,0 +1,12 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+ico = "0.6.0"
+# Same version Slint uses, so it is only built once.
+resvg = { version = "0.47", default-features = false }

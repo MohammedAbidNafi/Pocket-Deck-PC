@@ -1,0 +1,4 @@
+/target
+/.claude/settings.local.json
+*.msi
+.DS_Store

@@ -1,0 +1,84 @@
+name: Release
+
+# Publishes a GitHub Release whenever the workspace version in Cargo.toml changes on main:
+# if tag v<version> doesn't exist yet, build PocketDeck.exe, tag the commit and attach the program.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release on version change
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          # The first `version = "…"` after [workspace.package].
+          version=$(awk '/^\[workspace.package\]/ { on = 1; next } /^\[/ { on = 0 } on && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }' Cargo.toml)
+          if [ -z "$version" ]; then echo "::error::version not found under [workspace.package] in Cargo.toml"; exit 1; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+            echo "Tag v$version already exists; nothing to release."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version $version; releasing."
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.version.outputs.new == 'true'
+
+      - name: Test and build
+        if: steps.version.outputs.new == 'true'
+        run: |
+          cargo test --workspace --locked
+          cargo build --release --locked -p pocketdeck-pc
+          cp target/release/PocketDeck.exe "PocketDeck-${{ steps.version.outputs.version }}.exe"
+
+      - name: Publish release
+        if: steps.version.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          notes="$RUNNER_TEMP/notes.md"
+          # This version's notes from README.md ("### <version>" under "## Release notes"), if written.
+          awk -v v="### $VERSION" '
+            $0 == v { on = 1; next }
+            on && (/^### / || /^## /) { exit }
+            on { print }
+          ' README.md | sed -e '/./,$!d' > "$RUNNER_TEMP/readme-notes.md"
+          {
+            if [ -s "$RUNNER_TEMP/readme-notes.md" ]; then
+              echo "## What's new"
+              echo
+              cat "$RUNNER_TEMP/readme-notes.md"
+              echo
+            fi
+            echo "Download \`PocketDeck-$VERSION.exe\` below and run it. Nothing to install; setup walks you through the rest."
+            echo
+            echo "> The program isn't code-signed yet, so Windows SmartScreen may warn the first time. Choose **More info → Run anyway**."
+            echo
+          } > "$notes"
+          gh release create "v$VERSION" "PocketDeck-$VERSION.exe" \
+            --target "$GITHUB_SHA" \
+            --title "PocketDeck for PC $VERSION" \
+            --notes-file "$notes" \
+            --generate-notes

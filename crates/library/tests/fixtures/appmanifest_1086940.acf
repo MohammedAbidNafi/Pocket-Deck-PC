@@ -1,0 +1,13 @@
+"AppState"
+{
+	"appid"		"1086940"
+	"universe"		"1"
+	"name"		"Baldur's Gate 3"
+	"StateFlags"		"4"
+	"installdir"		"Baldurs Gate 3"
+	"LastUpdated"		"1731000000"
+	"UserConfig"
+	{
+		"language"		"english"
+	}
+}

@@ -1,0 +1,126 @@
+// PocketDeck design tokens, ported value for value from the Android app
+// (ui/theme/Theme.kt and ui/components/Tiles.kt there).
+
+export struct Accent {
+    name: string,
+    color: color,
+}
+
+export global Palette {
+    out property <color> background: #0A0D13;
+    out property <color> surface: #141922;
+    out property <color> surface-high: #1D2430;
+    out property <color> surface-higher: #283141;
+    out property <color> outline: #FFFFFF22;
+    out property <color> text: #EFF3F8;
+    out property <color> text-dim: #9AA4B4;
+    out property <color> text-faint: #5E6878;
+    out property <color> danger: #FF5A5F;
+    out property <color> favorite: #FFC542;
+    // "Needs attention" marks. The Amber accent, so it never clashes with the palette.
+    out property <color> attention: #FFB020;
+}
+
+export global Theme {
+    // Same six accents, names and order as the phone, so an index means the same colour on both.
+    out property <[Accent]> accents: [
+        { name: "Steam blue", color: #1A9FFF },
+        { name: "Neon red", color: #FF3D57 },
+        { name: "Electric purple", color: #9B6BFF },
+        { name: "Mint", color: #2EE6A6 },
+        { name: "Amber", color: #FFB020 },
+        { name: "Pink", color: #FF5FC8 },
+    ];
+    in-out property <int> accent-index: 0;
+    out property <color> accent: root.accents[root.accent-index].color;
+
+    // 0 round, 1 square, 2 rectangle (TileShape on the phone).
+    in-out property <int> tile-shape: 2;
+    // 0 small, 1 medium, 2 large (TileSize on the phone).
+    in-out property <int> tile-size: 1;
+
+    // TileMetrics: base box-art width per size; wide tiles are 2.05x as wide and 16:9.
+    out property <length> cover-width: root.tile-size == 0 ? 124px : root.tile-size == 2 ? 182px : 150px;
+    out property <length> cover-height: root.cover-width * 4 / 3;
+    out property <length> wide-width: root.cover-width * 2.05;
+    out property <length> wide-height: root.wide-width * 9 / 16;
+
+    out property <length> screen-padding: 48px;
+    out property <length> top-bar-height: 64px;
+}
+
+export global Type {
+    // The phone uses the system sans (Roboto). Windows' own sans stands in until Roboto is bundled.
+    out property <string> display-family: "Segoe UI Variable Display";
+    out property <string> text-family: "Segoe UI Variable Text";
+}
+
+// ConsoleTypography, as text components.
+
+export component DisplayText inherits Text {
+    font-family: Type.display-family;
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: Palette.text;
+}
+
+export component PageTitle inherits Text {
+    font-family: Type.display-family;
+    font-size: 36px;
+    font-weight: 700;
+    color: Palette.text;
+    wrap: word-wrap;
+}
+
+export component HeadlineText inherits Text {
+    font-family: Type.display-family;
+    font-size: 30px;
+    font-weight: 800;
+    color: Palette.text;
+    wrap: word-wrap;
+}
+
+export component TitleText inherits Text {
+    font-size: 16px;
+    font-weight: 600;
+    color: Palette.text;
+    overflow: elide;
+}
+
+export component BodyText inherits Text {
+    font-size: 16px;
+    color: Palette.text-dim;
+    wrap: word-wrap;
+}
+
+export component SmallText inherits Text {
+    font-size: 12px;
+    color: Palette.text-dim;
+    wrap: word-wrap;
+}
+
+// Uppercase section labels (labelLarge / labelMedium on the phone).
+export component LabelText inherits Text {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    color: Palette.text-dim;
+}
+
+// Motion helpers, so animations feel like the phone's Compose springs.
+export global Motion {
+    // A damped spring going from 0 to 1, like Compose's spring(dampingRatio, stiffness).
+    // `t` is seconds since it started; below 0 it hasn't started yet.
+    public pure function spring(t: float, damping: float, stiffness: float) -> float {
+        if (t <= 0) {
+            return 0;
+        }
+        return 1 - pow(2.718281828, -damping * sqrt(stiffness) * t) * (cos(1rad * sqrt(stiffness) * sqrt(1 - damping * damping) * t) + damping / sqrt(1 - damping * damping) * sin(1rad * sqrt(stiffness) * sqrt(1 - damping * damping) * t));
+    }
+
+    // Material's FastOutSlowIn, close enough for progress sweeps.
+    public pure function fast-out-slow-in(p: float) -> float {
+        return 1 - pow(1 - clamp(p, 0, 1), 3);
+    }
+}

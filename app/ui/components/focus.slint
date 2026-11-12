@@ -1,0 +1,172 @@
+import { Palette, Theme } from "../theme.slint";
+import { Sfx } from "../state.slint";
+
+// The basic interactive surface, after the phone's FocusCard (Focus.kt).
+//
+// Keyboard focus looks exactly like the phone's controller focus: the card grows with a little
+// spring, gets a crisp white ring and an accent halo. A mouse hover is quieter, a small lift and
+// a softer glow, so moving the pointer around doesn't flash rings everywhere. Pressing sinks it.
+// Click, Enter or Space triggers `clicked`, with the phone's "select" sound.
+export component FocusCard {
+    in property <length> corner: 14px;
+    in property <float> focus-scale: 1.07;
+    // How much of the focus growth a hover gets.
+    in property <float> hover-share: 0.5;
+    in property <color> glow-color: Theme.accent;
+    in property <brush> background: transparent;
+    in property <brush> border-color: transparent;
+    in property <length> border-width: 0px;
+    // Soft shadow while resting (primary buttons).
+    in property <color> rest-shadow: transparent;
+    in property <bool> enabled: true;
+    in property <string> label;
+    in property <string> click-sound: "select";
+
+    out property <bool> hovered: root.enabled && ta.has-hover;
+    out property <bool> focused: root.enabled && fs.has-focus;
+    out property <bool> active: root.hovered || root.focused;
+    out property <bool> pressed: root.enabled && ta.pressed;
+    callback clicked();
+
+    forward-focus: fs;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => {
+        root.activate();
+    }
+
+    function activate() {
+        Sfx.play(root.click-sound);
+        root.clicked();
+    }
+
+    property <float> glow: root.focused ? 1 : root.hovered ? 0.45 : 0;
+    animate glow { duration: 170ms; }
+    property <float> ring: root.focused ? 1 : 0;
+    animate ring { duration: 150ms; }
+
+    changed focused => {
+        if (root.focused) {
+            Sfx.play("move");
+        }
+    }
+
+    transform-scale: root.pressed ? 0.97 : root.focused ? root.focus-scale : root.hovered ? 1 + (root.focus-scale - 1) * root.hover-share : 1;
+    animate transform-scale {
+        duration: root.pressed ? 90ms : 320ms;
+        easing: ease-out-back;
+    }
+    opacity: root.enabled ? 1 : 0.45;
+    animate opacity { duration: 150ms; }
+
+    // Halo behind the card: the resting shadow, turning into an accent glow when active.
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        border-radius: root.corner;
+        drop-shadow-blur: root.glow > 0.01 ? 26px : 16px;
+        drop-shadow-offset-y: root.glow > 0.01 ? 0px : 4px;
+        drop-shadow-color: root.glow > 0.01 ? root.glow-color.with-alpha(0.55 * root.glow) : root.rest-shadow;
+    }
+
+    VerticalLayout {
+        Rectangle {
+            clip: true;
+            border-radius: root.corner;
+            background: root.background;
+            border-color: root.border-color;
+            border-width: root.border-width;
+            @children
+        }
+    }
+
+    // Keyboard-focus ring, just outside the edge.
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: root.corner + 4px;
+        border-width: 3px;
+        border-color: #ffffff.with-alpha(0.92 * root.ring);
+    }
+
+    // Keyboard first, pointer on top: a FocusScope above the TouchArea would eat the first click.
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == " ") {
+                root.activate();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            root.activate();
+        }
+    }
+}
+
+// Children appear with a small pop (scale and fade) when this element is created.
+// Wrap anything shown by an `if` to have it pop in.
+export component PopIn {
+    in property <float> from: 0.6;
+    in property <duration> delay: 0ms;
+    property <bool> shown: false;
+    init => {
+        root.shown = true;
+    }
+    Rectangle {
+        width: root.width;
+        height: root.height;
+        opacity: root.shown ? 1 : 0;
+        transform-scale: root.shown ? 1 : root.from;
+        animate opacity {
+            duration: 220ms;
+            delay: root.delay;
+        }
+        animate transform-scale {
+            duration: 380ms;
+            delay: root.delay;
+            easing: ease-out-back;
+        }
+        @children
+    }
+}
+
+// Children fade in and rise a little when created (list rows, cards, pages).
+export component RiseIn {
+    in property <duration> delay: 0ms;
+    in property <length> distance: 10px;
+    property <bool> shown: false;
+    init => {
+        root.shown = true;
+    }
+    VerticalLayout {
+        Rectangle {
+            opacity: root.shown ? 1 : 0;
+            transform-scale: root.shown ? 1 : 0.985;
+            transform-origin: { x: self.width / 2, y: 0px };
+            animate opacity {
+                duration: 300ms;
+                delay: root.delay;
+                easing: ease-out;
+            }
+            animate transform-scale {
+                duration: 360ms;
+                delay: root.delay;
+                easing: ease-out;
+            }
+            VerticalLayout {
+                @children
+            }
+        }
+    }
+}

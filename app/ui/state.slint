@@ -1,0 +1,158 @@
+// State and actions shared between the Rust side and the UI.
+
+// What PocketDeck knows about Sunshine right now.
+export struct EngineStatus {
+    // At least one check has finished.
+    checked: bool,
+    installed: bool,
+    version: string,
+    location: string,
+    // Older than the version PocketDeck needs.
+    outdated: bool,
+    running: bool,
+    // The service is starting or stopping.
+    changing: bool,
+    // The server answered on its GameStream port.
+    answering: bool,
+    host-name: string,
+    // A stream is running right now.
+    busy: bool,
+    port: int,
+    controller: bool,
+}
+
+// A long-running action (installing, restarting).
+export struct Task {
+    active: bool,
+    // "install" or "restart"
+    kind: string,
+    label: string,
+    // 0..1, or below 0 when there is no way to tell.
+    progress: float,
+    error: string,
+}
+
+export global Engine {
+    in-out property <EngineStatus> status;
+    in-out property <Task> task;
+    in property <string> pinned-version;
+    // The person installed Sunshine themselves, so they know it by name. When PocketDeck set it
+    // up (or nothing is installed yet) it's just "the streaming engine".
+    in property <bool> own-sunshine;
+    out property <string> name: root.own-sunshine ? "Sunshine" : "Streaming engine";
+    out property <string> name-lower: root.own-sunshine ? "Sunshine" : "the streaming engine";
+    callback refresh();
+    callback install();
+    callback restart();
+    callback open-driver-page();
+}
+
+export global App {
+    in-out property <bool> onboarding: true;
+    in-out property <int> onboarding-step: 0;
+    // The "setting up" hand-off at the end of setup is showing.
+    in-out property <bool> finishing: false;
+    in-out property <bool> start-with-windows: true;
+    in-out property <bool> close-to-tray: true;
+    in-out property <bool> ui-sounds: true;
+    in property <string> version;
+    // The startup intro is on screen, and has begun (it waits for its sound to be ready).
+    in-out property <bool> show-intro: false;
+    in property <bool> intro-running: false;
+    in property <float> intro-speed: 1;
+    // 0 Home, 1 Library, 2 Devices, 3 Settings
+    in-out property <int> tab: 0;
+
+    callback look-changed();
+    callback general-changed();
+    callback step-changed();
+    callback finish-onboarding();
+    callback run-setup-again();
+    callback open-url(string);
+}
+
+export global Links {
+    out property <string> repository: "https://github.com/MohammedAbidNafi/Pocket-Deck";
+    out property <string> sunshine: "https://github.com/SunshineStream/Sunshine";
+}
+
+// UI sounds, the same ones as the phone: "move", "select", "back", "toggle", "intro".
+export global Sfx {
+    callback play(string);
+}
+
+// One game in PocketDeck's library grid.
+export struct GameItem {
+    key: string,
+    name: string,
+    // "steam", "epic", "gog", "manual"
+    source: string,
+    thumb: image,
+    has-thumb: bool,
+    // Goes to the phone (not hidden).
+    on: bool,
+    // Extra state, e.g. "Already in Sunshine".
+    note: string,
+}
+
+// One launcher, for the per-launcher switches.
+export struct SourceItem {
+    id: string,
+    label: string,
+    found: bool,
+    count: int,
+    on: bool,
+}
+
+export global Library {
+    // The games shown under the current filter.
+    in property <[GameItem]> games;
+    // Games going to the phone, for the shelf on Home.
+    in property <[GameItem]> shelf;
+    // Launchers, for their on/off switches.
+    in property <[SourceItem]> sources;
+    // Filter chips: "all" plus every source that has games.
+    in property <[SourceItem]> filters;
+    in-out property <string> filter: "all";
+    callback filter-changed();
+    // Starts busy, so the screen shows progress (not "no games") until the first scan is in.
+    in property <bool> busy: true;
+    // 0..1, or below 0 when there's no telling.
+    in property <float> progress: -1;
+    // "checking", "ok", "needs-login", "unreachable"
+    in property <string> access: "checking";
+    in property <string> message: "Looking for your games…";
+    in property <string> error;
+    in property <int> on-phone;
+    callback refresh();
+    callback toggle-game(string);
+    callback toggle-source(string);
+    callback add-game();
+    callback login(string, string);
+    callback reset-login();
+}
+
+// A phone paired with Sunshine.
+export struct PairedDevice {
+    uuid: string,
+    name: string,
+}
+
+// Pairing a phone by QR code, and the phones already paired.
+export global Pairing {
+    // "idle", "preparing", "showing", "pairing", "paired", "failed", "expired"
+    in property <string> state: "idle";
+    // The QR code, dark on white with its quiet zone, one pixel per module (draw it pixelated).
+    in property <image> code;
+    in property <string> pc-name;
+    in property <int> seconds-left;
+    // What went wrong, or the paired phone's name.
+    in property <string> message;
+    in property <[PairedDevice]> devices;
+    in property <bool> devices-loaded;
+    in property <string> devices-error;
+    callback start();
+    callback stop();
+    callback load-devices();
+    callback unpair(string);
+}

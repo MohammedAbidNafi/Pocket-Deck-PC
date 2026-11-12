@@ -1,0 +1,131 @@
+// Game tiles, after the phone's GameTile (Tiles.kt): box art in the chosen shape and size,
+// with the name underneath.
+
+import { Palette, Theme } from "../theme.slint";
+import { GameItem } from "../state.slint";
+import { FocusCard } from "focus.slint";
+import { Icons } from "icons.slint";
+
+// Paints the page colour outside a rounded rectangle (or circle), so square artwork looks
+// rounded. Needed because the software renderer can't clip to rounded corners.
+export component CornerMask {
+    in property <length> radius;
+    in property <color> color: Palette.background;
+    property <float> w: root.width / 1px;
+    property <float> h: root.height / 1px;
+    property <float> r: min(root.radius / 1px, min(root.w, root.h) / 2);
+    // Drawn 2px past every edge so no sliver of artwork shows along the border.
+    property <float> m: 2;
+    Path {
+        x: -2px;
+        y: -2px;
+        width: root.width + 4px;
+        height: root.height + 4px;
+        viewbox-x: -root.m;
+        viewbox-y: -root.m;
+        viewbox-width: root.w + 2 * root.m;
+        viewbox-height: root.h + 2 * root.m;
+        fill: root.color;
+        fill-rule: evenodd;
+        // Outer box clockwise, rounded hole anticlockwise: a hole under either fill rule
+        // (the software renderer doesn't honour even-odd).
+        commands: "M \{-root.m} \{-root.m} L \{root.w + root.m} \{-root.m} L \{root.w + root.m} \{root.h + root.m} L \{-root.m} \{root.h + root.m} Z M \{root.r} 0 A \{root.r} \{root.r} 0 0 0 0 \{root.r} L 0 \{root.h - root.r} A \{root.r} \{root.r} 0 0 0 \{root.r} \{root.h} L \{root.w - root.r} \{root.h} A \{root.r} \{root.r} 0 0 0 \{root.w} \{root.h - root.r} L \{root.w} \{root.r} A \{root.r} \{root.r} 0 0 0 \{root.w - root.r} 0 Z";
+    }
+}
+
+export global TileMetrics {
+    // Box-art tiles: 3:4 rectangles, or squares / circles of the cover width.
+    out property <length> width: Theme.cover-width;
+    out property <length> height: Theme.tile-shape == 2 ? Theme.cover-height : Theme.cover-width;
+    out property <length> corner: Theme.tile-shape == 0 ? Theme.cover-width / 2 : 14px;
+    // Room under each tile for the name and a note.
+    out property <length> caption: 44px;
+}
+
+export component GameTile {
+    in property <GameItem> game;
+    callback toggled();
+
+    width: TileMetrics.width;
+    height: TileMetrics.height + TileMetrics.caption;
+
+    card := FocusCard {
+        x: 0;
+        y: 0;
+        width: TileMetrics.width;
+        height: TileMetrics.height;
+        corner: TileMetrics.corner;
+        label: root.game.name;
+        click-sound: "toggle";
+        background: Palette.surface-high;
+        clicked => {
+            root.toggled();
+        }
+
+        Rectangle {
+            width: TileMetrics.width;
+            height: TileMetrics.height;
+
+            if root.game.has-thumb: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.game.thumb;
+                image-fit: cover;
+            }
+            // No art: the name on an accent-tinted card.
+            if !root.game.has-thumb: Rectangle {
+                background: Theme.accent.mix(Palette.surface-high, 0.28);
+                Text {
+                    x: 12px;
+                    width: parent.width - 24px;
+                    text: root.game.name;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #ffffff;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+            // Hidden from the phone: dimmed, with a crossed-out eye.
+            Rectangle {
+                background: Palette.background.with-alpha(root.game.on ? 0 : 0.66);
+                animate background { duration: 200ms; }
+            }
+            if !root.game.on: Image {
+                width: 30px;
+                height: 30px;
+                source: Icons.eye-off;
+                colorize: Palette.text;
+            }
+            CornerMask {
+                width: parent.width;
+                height: parent.height;
+                radius: TileMetrics.corner;
+            }
+        }
+    }
+
+    Text {
+        x: Theme.tile-shape == 0 ? (root.width - self.width) / 2 : 2px;
+        y: TileMetrics.height + 10px;
+        width: root.width - 4px;
+        text: root.game.name;
+        font-size: 14px;
+        font-weight: 600;
+        overflow: elide;
+        horizontal-alignment: Theme.tile-shape == 0 ? center : left;
+        color: card.active ? Palette.text : root.game.on ? Palette.text.with-alpha(0.82) : Palette.text-faint;
+        animate color { duration: 150ms; }
+    }
+    Text {
+        x: Theme.tile-shape == 0 ? (root.width - self.width) / 2 : 2px;
+        y: TileMetrics.height + 28px;
+        width: root.width - 4px;
+        text: root.game.note != "" ? root.game.note : root.game.on ? "" : "Hidden from your phone";
+        font-size: 11px;
+        overflow: elide;
+        horizontal-alignment: Theme.tile-shape == 0 ? center : left;
+        color: root.game.note != "" ? Palette.attention : Palette.text-faint;
+    }
+}

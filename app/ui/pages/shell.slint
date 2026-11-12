@@ -1,0 +1,625 @@
+// The main window after setup: top bar with pill tabs (MainShell.kt on the phone) and the pages.
+
+import { ScrollView } from "std-widgets.slint";
+import { Palette, Theme, Type, DisplayText, PageTitle, HeadlineText, TitleText, BodyText, SmallText, LabelText } from "../theme.slint";
+import { App, Engine, Links, Library, Pairing } from "../state.slint";
+import { FocusCard } from "../components/focus.slint";
+import { ConsoleButton, IconBadge, IconPill, ProgressBar, SectionHeader, SettingRow, RiseIn } from "../components/widgets.slint";
+import { LookControls } from "../components/look.slint";
+import { EngineGrid } from "../components/engine.slint";
+import { GameTile, TileMetrics } from "../components/tiles.slint";
+import { LibraryContent } from "library.slint";
+import { DevicesContent } from "devices.slint";
+import { Icons } from "../components/icons.slint";
+
+component TabPill inherits FocusCard {
+    in property <string> text;
+    in property <bool> selected;
+    label: root.text;
+    corner: 20px;
+    focus-scale: 1.08;
+    click-sound: "toggle";
+    background: root.focused ? #ffffff : root.selected ? Theme.accent.with-alpha(0.28) : #ffffff.with-alpha(root.hovered ? 0.08 : 0);
+    animate background { duration: 180ms; }
+    HorizontalLayout {
+        padding-left: 18px;
+        padding-right: 18px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        Text {
+            text: root.text;
+            font-size: 16px;
+            font-weight: 600;
+            color: root.focused ? Palette.background : root.selected || root.hovered ? Palette.text : Palette.text-dim;
+            animate color { duration: 150ms; }
+        }
+    }
+}
+
+// The streaming engine at a glance, top right.
+component StatusChip inherits FocusCard {
+    property <bool> ready: Engine.status.answering;
+    property <color> tint: !Engine.status.checked ? Palette.text-faint : root.ready ? Theme.accent : Palette.attention;
+    label: "Streaming status";
+    corner: 18px;
+    focus-scale: 1.05;
+    background: root.focused ? #ffffff : #ffffff.with-alpha(root.hovered ? 0.12 : 0.06);
+    border-width: 1px;
+    border-color: root.tint.with-alpha(0.35);
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 16px;
+        spacing: 8px;
+        padding-top: 9px;
+        padding-bottom: 9px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: root.tint;
+                drop-shadow-blur: 6px;
+                drop-shadow-color: root.tint;
+                animate background { duration: 300ms; }
+            }
+        }
+        Text {
+            vertical-alignment: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: root.focused ? Palette.background : Palette.text;
+            text: !Engine.status.checked ? "Checking…" : Engine.status.busy ? "Streaming" : root.ready ? "Ready to stream" : "Needs attention";
+        }
+    }
+}
+
+component TopBar inherits Rectangle {
+    height: Theme.top-bar-height;
+    background: @linear-gradient(180deg, Palette.background.with-alpha(0.85) 0%, Palette.background.with-alpha(0) 100%);
+    HorizontalLayout {
+        padding-left: Theme.screen-padding - 12px;
+        padding-right: Theme.screen-padding - 12px;
+        spacing: 4px;
+        VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: center;
+            Image {
+                source: Icons.logo;
+                width: 44px;
+                height: 44px;
+            }
+        }
+        Rectangle {
+            width: 12px;
+        }
+        for name[i] in ["Home", "Library", "Devices"]: VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: center;
+            padding-left: 2px;
+            padding-right: 2px;
+            TabPill {
+                text: name;
+                selected: App.tab == i;
+                clicked => {
+                    App.tab = i;
+                }
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: center;
+            StatusChip {
+                clicked => {
+                    App.tab = 0;
+                    Engine.refresh();
+                }
+            }
+        }
+        Rectangle {
+            width: 10px;
+        }
+        VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: center;
+            IconPill {
+                icon: Icons.settings;
+                label: "Settings";
+                selected: App.tab == 3;
+                clicked => {
+                    App.tab = 3;
+                }
+            }
+        }
+    }
+}
+
+// Fades a page in when it appears.
+component Page inherits Rectangle {
+    opacity: 0;
+    y: 12px;
+    animate opacity {
+        duration: 240ms;
+        easing: ease-out;
+    }
+    animate y {
+        duration: 320ms;
+        easing: ease-out;
+    }
+    init => {
+        self.opacity = 1;
+        self.y = 0;
+    }
+}
+
+// A feature that is on its way.
+component ComingCard inherits Rectangle {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> body;
+    in property <string> badge: "COMING NEXT";
+    // Fired when the card is clicked (only cards for something that's already here use it).
+    callback clicked();
+    border-radius: 26px;
+    background: hover.has-hover ? Palette.surface-high.with-alpha(0.9) : Palette.surface.with-alpha(0.85);
+    border-width: 1px;
+    border-color: hover.has-hover ? Theme.accent.with-alpha(0.45) : Palette.outline;
+    drop-shadow-blur: hover.has-hover ? 24px : 0px;
+    drop-shadow-color: Theme.accent.with-alpha(0.18);
+    animate background, border-color, drop-shadow-blur { duration: 200ms; }
+    VerticalLayout {
+        padding: 22px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 12px;
+            IconBadge {
+                icon: root.icon;
+                size: 40px;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            VerticalLayout {
+                alignment: start;
+                Rectangle {
+                    border-radius: 10px;
+                    background: Theme.accent.with-alpha(0.16);
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        padding-top: 4px;
+                        padding-bottom: 4px;
+                        LabelText {
+                            text: root.badge;
+                            font-size: 10px;
+                            font-weight: 700;
+                            letter-spacing: 1.2px;
+                            color: Theme.accent;
+                        }
+                    }
+                }
+            }
+        }
+        Text {
+            text: root.title;
+            font-size: 20px;
+            font-weight: 700;
+            color: Palette.text;
+        }
+        BodyText {
+            text: root.body;
+            font-size: 14px;
+        }
+    }
+    // Last, so nothing above it swallows the first click.
+    hover := TouchArea {
+        mouse-cursor: root.badge == "COMING NEXT" ? default : pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A row of game tiles, as many as fit (the phone's Home shelves).
+component Shelf inherits Rectangle {
+    property <length> gap: 22px;
+    property <int> fit: max(1, floor((root.width + root.gap) / (TileMetrics.width + root.gap)));
+    height: TileMetrics.height + TileMetrics.caption;
+    for game[i] in Library.shelf: Rectangle {
+        x: i * (TileMetrics.width + root.gap);
+        y: 0;
+        width: TileMetrics.width;
+        height: root.height;
+        if i < root.fit: GameTile {
+            game: game;
+            toggled => {
+                App.tab = 1;
+            }
+        }
+    }
+}
+
+component SectionTitle inherits HorizontalLayout {
+    in property <string> text;
+    in property <string> detail;
+    spacing: 10px;
+    Text {
+        text: root.text;
+        font-size: 20px;
+        font-weight: 700;
+        color: Palette.text;
+        vertical-alignment: center;
+    }
+    if root.detail != "": Text {
+        text: root.detail;
+        font-size: 14px;
+        color: Palette.text-dim;
+        vertical-alignment: center;
+    }
+    Rectangle {
+        horizontal-stretch: 1;
+    }
+    VerticalLayout {
+        alignment: center;
+        @children
+    }
+}
+
+component HomePage inherits Page {
+    property <bool> ready: Engine.status.answering;
+    ScrollView {
+        HorizontalLayout {
+            alignment: center;
+            padding-left: Theme.screen-padding;
+            padding-right: Theme.screen-padding;
+            padding-top: 12px;
+            padding-bottom: 36px;
+            VerticalLayout {
+                // Comfortable on any window: wide screens get margins, not stretched rows,
+                // and sections stay packed at the top.
+                max-width: 1180px;
+                alignment: start;
+                spacing: 30px;
+
+                // This PC, at a glance.
+                HorizontalLayout {
+                    spacing: 24px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        LabelText {
+                            text: "THIS PC";
+                            font-size: 14px;
+                            font-weight: 700;
+                            letter-spacing: 0.4px;
+                            color: Theme.accent;
+                        }
+                        PageTitle {
+                            text: Engine.status.host-name != "" ? Engine.status.host-name : "Your PC";
+                        }
+                        BodyText {
+                            text: !Engine.status.checked ? "Checking this PC…"
+                                : Engine.status.busy ? "A stream is running right now."
+                                : root.ready ? "Ready to stream. Open PocketDeck on your phone, connected to the same network, and pick a game."
+                                : "Something needs fixing before your phone can stream. Start with the first item marked below.";
+                        }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 0;
+                        alignment: center;
+                        HorizontalLayout {
+                            spacing: 12px;
+                            ConsoleButton {
+                                text: "Check again";
+                                icon: Icons.refresh;
+                                enabled: !Engine.task.active;
+                                clicked => {
+                                    Engine.refresh();
+                                    Library.refresh();
+                                }
+                            }
+                            ConsoleButton {
+                                text: "Restart \{Engine.name-lower}";
+                                icon: Icons.power;
+                                enabled: Engine.status.installed && !Engine.task.active;
+                                clicked => {
+                                    Engine.restart();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Your games, like the phone's Home.
+                VerticalLayout {
+                    spacing: 14px;
+                    SectionTitle {
+                        text: "On your phone";
+                        detail: Library.busy && Library.shelf.length == 0 ? Library.message
+                            : Library.shelf.length == 1 ? "1 game" : "\{Library.shelf.length} games";
+                        ConsoleButton {
+                            compact: true;
+                            text: "See all";
+                            icon: Icons.arrow-right;
+                            clicked => {
+                                App.tab = 1;
+                            }
+                        }
+                    }
+                    if Library.shelf.length > 0: RiseIn {
+                        Shelf { }
+                    }
+                    if Library.shelf.length == 0 && Library.busy: ProgressBar {
+                        value: Library.progress;
+                    }
+                    if Library.shelf.length == 0 && !Library.busy: Rectangle {
+                        border-radius: 14px;
+                        background: Palette.surface.with-alpha(0.7);
+                        HorizontalLayout {
+                            padding: 18px;
+                            spacing: 14px;
+                            VerticalLayout {
+                                alignment: center;
+                                IconBadge {
+                                    icon: Icons.games;
+                                    size: 36px;
+                                }
+                            }
+                            BodyText {
+                                font-size: 14px;
+                                vertical-alignment: center;
+                                text: Library.access == "needs-login" ? "Connect to Sunshine in Library to put your games on your phone." : "No games on your phone yet. Open Library to pick some.";
+                            }
+                        }
+                    }
+                }
+
+                // Streaming.
+                VerticalLayout {
+                    spacing: 14px;
+                    SectionTitle {
+                        text: "Streaming";
+                        detail: !Engine.status.checked ? "" : root.ready ? "Everything's ready" : "Needs attention";
+                    }
+                    EngineGrid { }
+                }
+
+                // What's on its way.
+                VerticalLayout {
+                    spacing: 14px;
+                    SectionTitle {
+                        text: "Coming next";
+                    }
+                    HorizontalLayout {
+                        spacing: 18px;
+                        RiseIn {
+                            delay: 200ms;
+                            preferred-width: 200px;
+                            horizontal-stretch: 1;
+                            ComingCard {
+                                icon: Icons.globe;
+                                title: "Play from anywhere";
+                                body: "Stream to your phone on mobile data or any Wi-Fi, without Tailscale or router setup. Your phone connects straight to this PC.";
+                            }
+                        }
+                        RiseIn {
+                            delay: 290ms;
+                            preferred-width: 200px;
+                            horizontal-stretch: 1;
+                            ComingCard {
+                                icon: Icons.qr;
+                                badge: "NEW";
+                                title: "Pair with one scan";
+                                body: "Show a code here and scan it with PocketDeck on your phone. No PINs to type.";
+                                clicked => {
+                                    App.tab = 2;
+                                    if Pairing.state == "idle" {
+                                        Pairing.start();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component LibraryPage inherits Page {
+    LibraryContent { }
+}
+
+component DevicesPage inherits Page {
+    DevicesContent { }
+}
+
+component SettingsPage inherits Page {
+    ScrollView {
+        HorizontalLayout {
+            alignment: center;
+            padding-left: Theme.screen-padding;
+            padding-right: Theme.screen-padding;
+            VerticalLayout {
+                max-width: 820px;
+                padding-top: 8px;
+                padding-bottom: 40px;
+                spacing: 8px;
+                PageTitle {
+                    text: "Settings";
+                }
+
+                SectionHeader {
+                    text: "LOOK";
+                }
+                Rectangle {
+                    border-radius: 12px;
+                    background: Palette.surface.with-alpha(0.7);
+                    HorizontalLayout {
+                        padding-left: 20px;
+                        padding-right: 20px;
+                        padding-bottom: 18px;
+                        spacing: 32px;
+                        LookControls {
+                            horizontal-stretch: 1;
+                        }
+                    }
+                }
+
+                SectionHeader {
+                    text: "GENERAL";
+                }
+                SettingRow {
+                    title: "Start with Windows";
+                    subtitle: "PocketDeck starts in the tray when you sign in, so your phone can always connect.";
+                    icon: Icons.power;
+                    has-toggle: true;
+                    toggle-on: App.start-with-windows;
+                    clicked => {
+                        App.start-with-windows = !App.start-with-windows;
+                        App.general-changed();
+                    }
+                }
+                SettingRow {
+                    title: "Keep running when closed";
+                    subtitle: "Closing the window leaves PocketDeck in the tray. Quit from the tray icon.";
+                    icon: Icons.monitor;
+                    has-toggle: true;
+                    toggle-on: App.close-to-tray;
+                    clicked => {
+                        App.close-to-tray = !App.close-to-tray;
+                        App.general-changed();
+                    }
+                }
+
+                SettingRow {
+                    title: "UI sounds";
+                    subtitle: "The same console-style sounds as PocketDeck on your phone.";
+                    icon: Icons.play;
+                    has-toggle: true;
+                    toggle-on: App.ui-sounds;
+                    clicked => {
+                        App.ui-sounds = !App.ui-sounds;
+                        App.general-changed();
+                    }
+                }
+
+                SectionHeader {
+                    text: "LIBRARY";
+                }
+                for src in Library.sources: VerticalLayout {
+                    SettingRow {
+                    title: src.label;
+                    subtitle: !src.found ? "Not installed on this PC." : src.count == 1 ? "1 game found" : "\{src.count} games found";
+                    icon: Icons.games;
+                    has-toggle: true;
+                    toggle-on: src.on && src.found;
+                    enabled: src.found;
+                    clicked => {
+                        Library.toggle-source(src.id);
+                    }
+                }
+                }
+
+                SectionHeader {
+                    text: "STREAMING HOST";
+                }
+                SettingRow {
+                    title: !Engine.status.installed ? "Streaming engine" : Engine.own-sunshine ? "Sunshine \{Engine.status.version}" : "Streaming engine \{Engine.status.version}";
+                    subtitle: !Engine.status.installed ? "Not set up. Run setup again to set it up." : Engine.own-sunshine ? Engine.status.location : "Set up by PocketDeck, at \{Engine.status.location}";
+                    value: !Engine.status.checked ? "" : Engine.status.answering ? "Ready" : Engine.status.running ? "Not answering" : Engine.status.installed ? "Stopped" : "Missing";
+                    icon: Icons.plug;
+                    clicked => {
+                        App.open-url(Links.sunshine);
+                    }
+                }
+                SettingRow {
+                    title: "Restart \{Engine.name-lower}";
+                    subtitle: "Asks for administrator permission.";
+                    icon: Icons.refresh;
+                    enabled: Engine.status.installed && !Engine.task.active;
+                    clicked => {
+                        Engine.restart();
+                    }
+                }
+                SettingRow {
+                    title: "Run setup again";
+                    subtitle: "Go through the first-run steps again.";
+                    icon: Icons.wrench;
+                    clicked => {
+                        App.run-setup-again();
+                    }
+                }
+
+                SectionHeader {
+                    text: "ABOUT";
+                }
+                SettingRow {
+                    title: "PocketDeck for PC";
+                    subtitle: "Free software under the GNU GPL v3.";
+                    value: App.version;
+                    icon: Icons.info;
+                    clicked => {
+                        App.open-url(Links.repository);
+                    }
+                }
+                Rectangle {
+                    border-radius: 12px;
+                    background: Palette.surface.with-alpha(0.7);
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 8px;
+                        TitleText {
+                            text: "Credits";
+                        }
+                        SmallText {
+                            text: "Streams with Sunshine by LizardByte and the Sunshine contributors (GPL v3). Interface built with Slint (GPL v3). Controller support uses ViGEmBus by Nefarius Software Solutions.";
+                        }
+                        SmallText {
+                            text: "The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.";
+                        }
+                        SmallText {
+                            text: "NVIDIA GameStream, Steam, Epic Games and GOG are trademarks of their respective owners. PocketDeck isn't affiliated with or endorsed by them, nor by LizardByte or the Moonlight project.";
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component MainShell inherits Rectangle {
+    background: Palette.background;
+
+    // Soft accent wash at the top, like the phone's backdrop.
+    if App.tab == 0: Rectangle {
+        height: 360px;
+        y: 0;
+        background: @linear-gradient(180deg, Theme.accent.with-alpha(0.10) 0%, Theme.accent.with-alpha(0) 100%);
+    }
+
+    Rectangle {
+        y: Theme.top-bar-height + 8px;
+        height: parent.height - self.y;
+        // Wrapped so each page's fade-in (opacity on its root) is applied.
+        if App.tab == 0: Rectangle {
+            HomePage { }
+        }
+        if App.tab == 1: Rectangle {
+            LibraryPage { }
+        }
+        if App.tab == 2: Rectangle {
+            DevicesPage { }
+        }
+        if App.tab == 3: Rectangle {
+            SettingsPage { }
+        }
+    }
+
+    TopBar {
+        y: 0;
+    }
+}
