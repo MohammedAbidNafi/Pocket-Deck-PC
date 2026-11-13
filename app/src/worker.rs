@@ -9,11 +9,15 @@ pub enum Command {
     Refresh,
     Install,
     Restart,
+    /// Install (or update) the virtual display: driver, service, firewall rule.
+    DisplaySetup,
+    DisplayRemove,
 }
 
 /// What the UI thread hears back.
 pub enum Update {
     Status(Status),
+    Display(pocketdeck_display::Overview),
     Task(TaskUpdate),
     Library(crate::library::Report),
     Pairing(crate::pairing::PairUpdate),
@@ -111,9 +115,14 @@ fn run(rx: Receiver<Command>, on_update: fn(Update)) {
             while let Ok(Command::Refresh) = rx.try_recv() {}
         }
         match command {
-            Command::Refresh => post(on_update, Update::Status(Status::gather())),
+            Command::Refresh => {
+                post(on_update, Update::Status(Status::gather()));
+                post(on_update, Update::Display(pocketdeck_display::Overview::gather()));
+            }
             Command::Install => do_install(on_update),
             Command::Restart => do_restart(on_update),
+            Command::DisplaySetup => do_display_setup(on_update),
+            Command::DisplayRemove => do_display_remove(on_update),
         }
     }
 }
@@ -131,6 +140,63 @@ fn finish(on_update: fn(Update), kind: &'static str, error: Option<String>) {
         Update::Task(TaskUpdate { active: false, kind, error: error.unwrap_or_default(), ..Default::default() }),
     );
     post(on_update, Update::Status(Status::gather()));
+    post(on_update, Update::Display(pocketdeck_display::Overview::gather()));
+}
+
+/// Downloads the pinned driver, then runs `PocketDeck.exe --display setup <zip>` elevated.
+fn do_display_setup(on_update: fn(Update)) {
+    use pocketdeck_display::{setup::exit, vdd};
+    const KIND: &str = "display";
+    let zip = pocketdeck_core::paths::local_dir()
+        .join("downloads")
+        .join(format!("VirtualDisplayDriver-{}.zip", vdd::PINNED.version));
+    task(on_update, KIND, "Downloading the virtual display driver…", 0.0);
+    let downloaded = install::download_verified(&vdd::PINNED, &zip, &mut |p| {
+        if let install::Progress::Downloading { done, total } = p {
+            let fraction = if total > 0 { done as f32 / total as f32 } else { 0.0 };
+            task(on_update, KIND, "Downloading the virtual display driver…", fraction * 0.5);
+        }
+    });
+    let zip = match downloaded {
+        Ok(z) => z,
+        Err(e) => return finish(on_update, KIND, Some(e.to_string())),
+    };
+    task(on_update, KIND, "Setting up. Windows will ask for permission.", -1.0);
+    let exe = match std::env::current_exe() {
+        Ok(e) => e.display().to_string(),
+        Err(e) => return finish(on_update, KIND, Some(e.to_string())),
+    };
+    let log = pocketdeck_display::data_dir().join("display.log");
+    let ran = sunshine::elevate::run(&exe, &format!("{} setup \"{}\"", pocketdeck_display::FLAG, zip.display()));
+    let error = match ran.map(|code| code as i32) {
+        Ok(exit::OK) => None,
+        Ok(exit::CHECKSUM) => Some("The driver download was damaged or changed. Try again.".to_string()),
+        Ok(exit::DRIVER) => Some(format!("Windows didn't install the virtual display driver. Details are in {}.", log.display())),
+        Ok(exit::SERVICE) => Some(format!("The virtual display service didn't start. Details are in {}.", log.display())),
+        Ok(code) => Some(format!("Setup stopped with code {code}. Details are in {}.", log.display())),
+        Err(sunshine::Error::Cancelled) => Some("Cancelled. Setting up the virtual display needs administrator permission.".into()),
+        Err(e) => Some(e.to_string()),
+    };
+    finish(on_update, KIND, error);
+}
+
+fn do_display_remove(on_update: fn(Update)) {
+    const KIND: &str = "display";
+    task(on_update, KIND, "Removing the virtual display. Windows will ask for permission.", -1.0);
+    let exe = match std::env::current_exe() {
+        Ok(e) => e.display().to_string(),
+        Err(e) => return finish(on_update, KIND, Some(e.to_string())),
+    };
+    let error = match sunshine::elevate::run(&exe, &format!("{} remove", pocketdeck_display::FLAG)) {
+        Ok(0) => None,
+        Ok(code) => Some(format!(
+            "Removing stopped with code {code}. Details are in {}.",
+            pocketdeck_display::data_dir().join("display.log").display()
+        )),
+        Err(sunshine::Error::Cancelled) => Some("Cancelled. Removing the virtual display needs administrator permission.".into()),
+        Err(e) => Some(e.to_string()),
+    };
+    finish(on_update, KIND, error);
 }
 
 fn do_install(on_update: fn(Update)) {

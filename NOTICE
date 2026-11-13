@@ -38,6 +38,10 @@ Not included:
   Sunshine (https://github.com/SunshineStream/Sunshine), the streaming host. PocketDeck uses an
   existing install, or downloads the official, checksum-pinned installer when the person asks it to.
   ViGEmBus (https://github.com/nefarius/ViGEmBus), the virtual controller driver Sunshine uses.
+  Virtual Display Driver (https://github.com/VirtualDrivers/Virtual-Display-Driver), MIT licence,
+  by MikeTheTech and the VirtualDrivers contributors; code signing by SignPath Foundation.
+  When the person switches on "Match your phone's screen", PocketDeck downloads one pinned,
+  checksum-verified release and installs it unchanged.
 
 Steam, Epic Games, GOG, Xbox and Microsoft Store are trademarks of their respective owners.
 NVIDIA GameStream is a

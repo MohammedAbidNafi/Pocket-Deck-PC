@@ -2,7 +2,7 @@
 
 import { ScrollView } from "std-widgets.slint";
 import { Palette, Theme, Type, DisplayText, PageTitle, HeadlineText, TitleText, BodyText, SmallText, LabelText } from "../theme.slint";
-import { App, Engine, Links, Library, Pairing } from "../state.slint";
+import { App, DisplayStatus, Engine, Links, Library, Pairing } from "../state.slint";
 import { FocusCard } from "../components/focus.slint";
 import { ConsoleButton, IconBadge, IconPill, ProgressBar, SectionHeader, SettingRow, RiseIn } from "../components/widgets.slint";
 import { LookControls } from "../components/look.slint";
@@ -437,6 +437,36 @@ component DevicesPage inherits Page {
     DevicesContent { }
 }
 
+// "Match your phone's screen": the virtual display that only exists while a phone streams.
+component DisplayRow inherits SettingRow {
+    property <bool> busy: Engine.task.active && Engine.task.kind == "display";
+    property <bool> failed: !Engine.task.active && Engine.task.kind == "display" && Engine.task.error != "";
+    property <DisplayStatus> d: Engine.display;
+
+    title: "Match your phone's screen";
+    subtitle: root.busy ? Engine.task.label
+        : root.failed ? Engine.task.error
+        : !d.installed ? "Adds a virtual display at your phone's resolution, switched on only while you stream. Asks for administrator permission."
+        : d.outdated ? "Set up by another version of PocketDeck. Update it to keep it working. Asks for administrator permission."
+        : !d.running ? "The virtual display service isn't running. Update it to repair it."
+        : d.in-use ? "In use. Your phone is streaming on the virtual display."
+        : "Games run at your phone's resolution. This PC's screen turns off while you stream and comes back after.";
+    value: root.busy ? "" : d.installed && (d.outdated || !d.running) ? "Update" : "";
+    icon: Icons.phone;
+    has-toggle: true;
+    toggle-on: d.installed;
+    enabled: d.checked && !Engine.task.active;
+    clicked => {
+        if (d.installed && (d.outdated || !d.running)) {
+            Engine.set-up-display();
+        } else if (d.installed) {
+            Engine.remove-display();
+        } else {
+            Engine.set-up-display();
+        }
+    }
+}
+
 component SettingsPage inherits Page {
     ScrollView {
         HorizontalLayout {
@@ -536,6 +566,7 @@ component SettingsPage inherits Page {
                         App.open-url(Links.sunshine);
                     }
                 }
+                DisplayRow { }
                 SettingRow {
                     title: "Restart \{Engine.name-lower}";
                     subtitle: "Asks for administrator permission.";
@@ -576,7 +607,7 @@ component SettingsPage inherits Page {
                             text: "Credits";
                         }
                         SmallText {
-                            text: "Streams with Sunshine by LizardByte and the Sunshine contributors (GPL v3). Interface built with Slint (GPL v3). Controller support uses ViGEmBus by Nefarius Software Solutions.";
+                            text: "Streams with Sunshine by LizardByte and the Sunshine contributors (GPL v3). Interface built with Slint (GPL v3). Controller support uses ViGEmBus by Nefarius Software Solutions. Matching your phone's screen uses Virtual Display Driver by MikeTheTech and the VirtualDrivers contributors (MIT).";
                         }
                         SmallText {
                             text: "The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.";

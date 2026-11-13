@@ -24,7 +24,7 @@ export struct EngineStatus {
 // A long-running action (installing, restarting).
 export struct Task {
     active: bool,
-    // "install" or "restart"
+    // "install", "restart" or "display"
     kind: string,
     label: string,
     // 0..1, or below 0 when there is no way to tell.
@@ -32,9 +32,25 @@ export struct Task {
     error: string,
 }
 
+// The virtual display that matches the phone's screen while it streams.
+export struct DisplayStatus {
+    // At least one check has finished.
+    checked: bool,
+    installed: bool,
+    // Set up by another version of PocketDeck: setup should run again.
+    outdated: bool,
+    running: bool,
+    // A phone is streaming on it right now.
+    in-use: bool,
+}
+
 export global Engine {
     in-out property <EngineStatus> status;
+    // A long-running action; kind "install", "restart" or "display".
     in-out property <Task> task;
+    in-out property <DisplayStatus> display;
+    callback set-up-display();
+    callback remove-display();
     in property <string> pinned-version;
     // The person installed Sunshine themselves, so they know it by name. When PocketDeck set it
     // up (or nothing is installed yet) it's just "the streaming engine".

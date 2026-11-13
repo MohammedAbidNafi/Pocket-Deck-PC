@@ -28,6 +28,7 @@ struct Shell {
     settings: Settings,
     engine: EngineStatus,
     task: Task,
+    display: DisplayStatus,
     /// Only exists while the window is open; dropped when it closes to the tray to free memory.
     window: Option<AppWindow>,
     tray: Option<tray::Tray>,
@@ -63,6 +64,10 @@ fn with<R>(f: impl FnOnce(&mut Shell) -> R) -> Option<R> {
 }
 
 fn main() {
+    // `--display …`: the virtual display service and its helpers, no window.
+    if let Some(code) = pocketdeck_display::cli::run_if_requested() {
+        std::process::exit(code);
+    }
     let start_in_tray = std::env::args().any(|a| a == autostart::TRAY_FLAG);
     let _instance = match instance::acquire(|| {
         let _ = slint::invoke_from_event_loop(show_window);
@@ -100,6 +105,7 @@ fn main() {
             settings,
             engine: EngineStatus::default(),
             task: Task::default(),
+            display: DisplayStatus::default(),
             window: None,
             tray,
             worker: worker.clone(),
@@ -331,6 +337,7 @@ fn push_everything(shell: &Shell, w: &AppWindow) {
     engine.set_own_sunshine(shell.engine.installed && !shell.settings.engine_by_pocketdeck);
     engine.set_status(shell.engine.clone());
     engine.set_task(shell.task.clone());
+    engine.set_display(shell.display.clone());
 }
 
 fn bind(w: &AppWindow) {
@@ -507,6 +514,8 @@ fn bind(w: &AppWindow) {
     });
     engine.on_install(|| start_task("install", Command::Install));
     engine.on_restart(|| start_task("restart", Command::Restart));
+    engine.on_set_up_display(|| start_task("display", Command::DisplaySetup));
+    engine.on_remove_display(|| start_task("display", Command::DisplayRemove));
     engine.on_open_driver_page(|| open_url(sunshine::CONTROLLER_DRIVER_URL));
 }
 
@@ -554,6 +563,15 @@ fn on_update(update: Update) {
                     tray.set_status(tray_text(&status, !s.settings.engine_by_pocketdeck));
                 }
             }
+            Update::Display(o) => {
+                s.display = DisplayStatus {
+                    checked: true,
+                    installed: o.installed,
+                    outdated: o.outdated(),
+                    running: o.running,
+                    in_use: o.in_use,
+                };
+            }
             Update::Pairing(u) => {
                 on_pairing(s, u);
                 return;
@@ -588,6 +606,7 @@ fn push_engine(s: &Shell) {
         let engine = w.global::<Engine>();
         engine.set_status(s.engine.clone());
         engine.set_task(s.task.clone());
+        engine.set_display(s.display.clone());
         engine.set_own_sunshine(s.engine.installed && !s.settings.engine_by_pocketdeck);
     }
 }
