@@ -52,14 +52,24 @@ pub fn install(download_dir: &Path, mut progress: impl FnMut(Progress)) -> crate
 }
 
 fn download(release: &Release, dir: &Path, progress: &mut impl FnMut(Progress)) -> crate::Result<PathBuf> {
-    std::fs::create_dir_all(dir)?;
-    let target = dir.join(format!("Sunshine-{}.msi", release.version));
+    download_verified(release, &dir.join(format!("Sunshine-{}.msi", release.version)), progress)
+}
+
+/// Downloads `release` to `target` and checks its SHA-256, reusing a verified earlier download.
+/// The file only appears at `target` once it has checked out.
+pub fn download_verified(release: &Release, target: &Path, progress: &mut impl FnMut(Progress)) -> crate::Result<PathBuf> {
+    if let Some(dir) = target.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let target = target.to_path_buf();
     if target.is_file() && sha256_file(&target)? == release.sha256 {
         progress(Progress::Downloading { done: release.size, total: release.size });
         return Ok(target);
     }
 
-    let partial = target.with_extension("msi.part");
+    let mut partial = target.clone().into_os_string();
+    partial.push(".part");
+    let partial = PathBuf::from(partial);
     let mut response = ureq::get(release.url)
         .call()
         .map_err(|e| crate::Error::Download(e.to_string()))?;
@@ -96,7 +106,8 @@ fn download(release: &Release, dir: &Path, progress: &mut impl FnMut(Progress)) 
     Ok(target)
 }
 
-fn sha256_file(path: &Path) -> std::io::Result<String> {
+/// SHA-256 of a file, lowercase hex.
+pub fn sha256_file(path: &Path) -> std::io::Result<String> {
     let mut file = std::fs::File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buf = vec![0u8; 64 * 1024];
