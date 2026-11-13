@@ -5,6 +5,7 @@ fn main() {
         println!("{} (launcher found: {}): {} games", source.label(), scan.launcher_found, scan.games.len());
         for g in &scan.games {
             println!("  {:<40} {:<22} art: {}", g.name, g.key, if g.art.is_some() { "yes" } else { "no" });
+            if std::env::var_os("SHOW_LAUNCH").is_some() { println!("      {:?}", g.launch); }
         }
     }
     println!("took {:?}", t.elapsed());

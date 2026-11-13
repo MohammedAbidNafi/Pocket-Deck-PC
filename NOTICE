@@ -25,6 +25,7 @@ Third-party components
   windows-sys                                         MIT / Apache-2.0   Microsoft
   windows-service                                     MIT / Apache-2.0   Mullvad VPN
   winreg                                              MIT                Igor Shaula
+  roxmltree                                           MIT / Apache-2.0   Yevhenii Reizner and contributors
   winresource                                         MIT                Max Resch
   raw-window-handle                                   MIT / Apache-2.0 / Zlib   Osspial and contributors
   resvg, ico (build tools only, not shipped)          Apache-2.0 / MIT, MIT   their contributors
@@ -37,7 +38,12 @@ Not included:
   Sunshine (https://github.com/SunshineStream/Sunshine), the streaming host. PocketDeck uses an
   existing install, or downloads the official, checksum-pinned installer when the person asks it to.
   ViGEmBus (https://github.com/nefarius/ViGEmBus), the virtual controller driver Sunshine uses.
+  Virtual Display Driver (https://github.com/VirtualDrivers/Virtual-Display-Driver), MIT licence,
+  by MikeTheTech and the VirtualDrivers contributors; code signing by SignPath Foundation.
+  When the person switches on "Match your phone's screen", PocketDeck downloads one pinned,
+  checksum-verified release and installs it unchanged.
 
-Steam, Epic Games and GOG are trademarks of their respective owners. NVIDIA GameStream is a
+Steam, Epic Games, GOG, Xbox and Microsoft Store are trademarks of their respective owners.
+NVIDIA GameStream is a
 trademark of NVIDIA Corporation. PocketDeck is not affiliated with any of them, nor with
 LizardByte or the Moonlight project.

@@ -1,12 +1,15 @@
-//! Finding the games installed on this PC: Steam, Epic Games and GOG, plus games the person
-//! adds by hand. Each scanner reads the launcher's own files and registry entries, so nothing
+//! Finding the games installed on this PC: Steam, Epic Games, GOG, the Xbox app and Microsoft
+//! Store, other games found among the installed programs, plus games the person adds by hand. Each scanner reads the launcher's own files and registry entries, so nothing
 //! needs the launcher to be running, and nothing goes online.
 
 pub mod covers;
 pub mod epic;
 pub mod gog;
+pub mod installed;
 pub mod steam;
+pub mod steamgriddb;
 pub mod vdf;
+pub mod xbox;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -17,17 +20,23 @@ pub enum Source {
     Steam,
     Epic,
     Gog,
+    Xbox,
+    /// Games found among the installed programs, from no particular launcher.
+    Other,
     Manual,
 }
 
 impl Source {
-    pub const LAUNCHERS: [Source; 3] = [Source::Steam, Source::Epic, Source::Gog];
+    pub const LAUNCHERS: [Source; 5] = [Source::Steam, Source::Epic, Source::Gog, Source::Xbox, Source::Other];
+    pub const ALL: [Source; 6] = [Source::Steam, Source::Epic, Source::Gog, Source::Xbox, Source::Other, Source::Manual];
 
     pub fn label(self) -> &'static str {
         match self {
             Source::Steam => "Steam",
             Source::Epic => "Epic Games",
             Source::Gog => "GOG",
+            Source::Xbox => "Xbox & Microsoft Store",
+            Source::Other => "Other games on this PC",
             Source::Manual => "Added by you",
         }
     }
@@ -45,7 +54,8 @@ pub enum Launch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Game {
-    /// Stable identity: `steam:<appid>`, `epic:<AppName>`, `gog:<id>`, `manual:<hash>`.
+    /// Stable identity: `steam:<appid>`, `epic:<AppName>`, `gog:<id>`, `xbox:<package family>`,
+    /// `pc:<hash>`, `manual:<hash>`.
     pub key: String,
     pub source: Source,
     pub name: String,
@@ -64,13 +74,18 @@ pub struct Scan {
     pub launcher_found: bool,
 }
 
-/// Scans every launcher. Takes tens of milliseconds; run it off the UI thread.
+/// Scans every launcher, then the installed programs for any other games. Takes well under a
+/// second; run it off the UI thread.
 pub fn scan_all() -> Vec<(Source, Scan)> {
-    vec![
+    let mut scans = vec![
         (Source::Steam, steam::scan()),
         (Source::Epic, epic::scan()),
         (Source::Gog, gog::scan()),
-    ]
+        (Source::Xbox, xbox::scan()),
+    ];
+    let known = scans.iter().flat_map(|(_, s)| s.games.iter().map(|g| installed::normalise(&g.name))).collect();
+    scans.push((Source::Other, installed::scan(&known)));
+    scans
 }
 
 /// A clean display name: trims, drops trademark signs, collapses spaces.

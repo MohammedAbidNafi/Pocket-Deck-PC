@@ -4016,13 +4016,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "pocketdeck-display"
+version = "0.1.0"
+dependencies = [
+ "pocketdeck-sunshine",
+ "rustls",
+ "serde_json",
+ "sha2",
+ "windows-service",
+ "windows-sys 0.61.2",
+ "winreg",
+]
+
+[[package]]
 name = "pocketdeck-library"
 version = "0.1.0"
 dependencies = [
  "image",
+ "roxmltree",
  "serde",
  "serde_json",
  "ureq",
+ "windows-sys 0.61.2",
  "winreg",
 ]
 
@@ -4031,6 +4046,7 @@ name = "pocketdeck-pc"
 version = "0.1.0"
 dependencies = [
  "pocketdeck-core",
+ "pocketdeck-display",
  "pocketdeck-library",
  "pocketdeck-sunshine",
  "qrcode",

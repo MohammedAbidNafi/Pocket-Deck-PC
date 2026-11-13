@@ -4,7 +4,7 @@
 use pocketdeck_core::library::{LibraryState, ManualGame};
 use pocketdeck_core::paths;
 use pocketdeck_core::sync::{self, Wanted};
-use pocketdeck_library::{Game, Source, covers};
+use pocketdeck_library::{Game, Source, covers, steamgriddb};
 use pocketdeck_sunshine::api::{Access, Api, Login, random_password};
 use pocketdeck_sunshine::{conf, detect, login};
 use std::path::PathBuf;
@@ -147,29 +147,37 @@ impl Librarian {
         progress(self, found, 0.1);
 
         // 2. Covers (written once, then reused as-is). Posted in batches so the grid fills in.
-        let with_art = games.iter().filter(|g| g.art.is_some() || g.art_url.is_some()).count().max(1);
+        // With SteamGridDB, every game can get a cover.
+        let sgdb = steamgriddb::available();
+        let with_art = games.iter().filter(|g| sgdb || g.art.is_some() || g.art_url.is_some()).count().max(1);
         let mut covers: Vec<Option<PathBuf>> = Vec::with_capacity(games.len());
         let mut done = 0;
         let mut last_post = std::time::Instant::now();
         for (i, g) in games.iter().enumerate() {
             let existed = covers::cover_path(&art_dir, &g.key).is_file();
-            // Local art, or (Epic) art fetched once from the launcher's CDN.
+            // Local art, or (Epic) art fetched once from the launcher's CDN, or failing both
+            // (games found among installed programs, games added by hand, missing launcher art)
+            // a cover from SteamGridDB.
             let art = g.art.clone().or_else(|| {
                 if existed && covers::thumb_path(&art_dir, &g.key).is_file() {
                     // Already made; no need to touch the network.
                     Some(covers::cover_path(&art_dir, &g.key))
                 } else {
-                    g.art_url.as_ref().and_then(|url| covers::fetch(&art_dir, &g.key, url))
+                    g.art_url.as_ref().and_then(|url| covers::fetch(&art_dir, &g.key, url)).or_else(|| {
+                        steamgriddb::cover_url(&art_dir, g).and_then(|url| covers::fetch(&art_dir, &g.key, &url))
+                    })
                 }
             });
             let cover = art.as_ref().and_then(|art| {
                 let c = covers::prepare(&art_dir, &g.key, art);
-                done += 1;
                 if !existed {
                     self.last.games[i].thumb = Some(covers::thumb_path(&art_dir, &g.key)).filter(|p| p.is_file());
                 }
                 c
             });
+            if sgdb || g.art.is_some() || g.art_url.is_some() {
+                done += 1;
+            }
             covers.push(cover);
             if last_post.elapsed().as_millis() > 150 {
                 last_post = std::time::Instant::now();
