@@ -47,7 +47,14 @@ jobs:
 
       - name: Test and build
         if: steps.version.outputs.new == 'true'
+        env:
+          # Built into the program for cover art (crates/library/build.rs). Without it, the
+          # release still works but games with no launcher art get no cover.
+          STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
         run: |
+          if [ -z "$STEAMGRIDDB_API_KEY" ]; then
+            echo "::warning::STEAMGRIDDB_API_KEY secret is not set; this release won't fetch covers from SteamGridDB."
+          fi
           cargo test --workspace --locked
           cargo build --release --locked -p pocketdeck-pc
           cp target/release/PocketDeck.exe "PocketDeck-${{ steps.version.outputs.version }}.exe"

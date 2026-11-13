@@ -15,7 +15,7 @@ It's built to be light: pure Rust with a [Slint](https://slint.dev) interface dr
 ## Features
 
 - **Streaming engine setup:** uses Sunshine if it's already installed, or downloads and installs the official release (checksum-pinned) with one administrator prompt. Home shows at a glance whether it's installed, running, answering and has the controller driver ([ViGEmBus](https://github.com/nefarius/ViGEmBus)), with a fix button for each.
-- **Your games, found for you:** scans Steam, Epic Games and GOG from their own files and registry entries, and lets you add any other game by picking its `.exe`. Turn off a whole launcher or hide single games.
+- **Your games, found for you:** scans Steam, Epic Games, GOG and the Xbox app / Microsoft Store from their own files and registry entries, looks through your other installed programs for games (EA app, Ubisoft Connect, Battle.net, Riot, standalone installers), and lets you add any other game by picking its `.exe`. Turn off a whole launcher or hide single games.
 - **On your phone with covers:** every game becomes a Sunshine app with its cover art, so it shows up in PocketDeck's library on the phone. PocketDeck only ever edits the apps it created; anything you made in Sunshine yourself is left alone.
 - **Pair with one scan:** **Devices → Pair a phone** shows a QR code. Scan it with PocketDeck on your phone (**Settings → PC streaming → Scan PC's code**) and it's paired. No PIN to type into Sunshine. The code includes the PC's certificate fingerprint, so the phone only pairs with the PC whose screen showed it. See [docs/pair-with-scan.md](docs/pair-with-scan.md).
 - **Paired phones:** see every device that can stream from this PC and unpair any of them.
@@ -78,7 +78,7 @@ app/                 # The Windows app
 └── ui/              # Slint UI: pages (intro, setup, home, library, devices, settings) and components
 crates/
 ├── core/            # Settings, app folders, start with Windows, library state, Sunshine app sync, pairing
-├── library/         # Steam, Epic Games and GOG scanners, manual games, cover art
+├── library/         # Steam, Epic, GOG, Xbox/Store and installed-program scanners, manual games, cover art
 └── sunshine/        # Finding, installing and checking Sunshine; its web API; login storage; certificate
 xtask/               # Developer tasks (icon generation)
 docs/                # Design notes, including the QR pairing contract shared with the phone app
@@ -99,4 +99,4 @@ PocketDeck for PC is free software under the [GNU General Public License v3](LIC
 
 ## Disclaimer
 
-PocketDeck doesn't include any games. Steam, Epic Games and GOG are trademarks of their respective owners, as is NVIDIA GameStream. PocketDeck is an independent project and isn't affiliated with or endorsed by any of them, nor by LizardByte or the Moonlight project.
+PocketDeck doesn't include any games. Steam, Epic Games, GOG, Xbox and Microsoft Store are trademarks of their respective owners, as is NVIDIA GameStream. PocketDeck is an independent project and isn't affiliated with or endorsed by any of them, nor by LizardByte or the Moonlight project.

@@ -693,12 +693,14 @@ fn source_id(source: Source) -> &'static str {
         Source::Steam => "steam",
         Source::Epic => "epic",
         Source::Gog => "gog",
+        Source::Xbox => "xbox",
+        Source::Other => "other",
         Source::Manual => "manual",
     }
 }
 
 fn source_from_id(id: &str) -> Option<Source> {
-    [Source::Steam, Source::Epic, Source::Gog, Source::Manual].into_iter().find(|s| source_id(*s) == id)
+    Source::ALL.into_iter().find(|s| source_id(*s) == id)
 }
 
 /// Sends the latest library report to the window, under the current filter.
@@ -711,7 +713,7 @@ fn push_library(s: &mut Shell) {
     let count = |src: Source| report.games.iter().filter(|g| g.source == src).count();
     let mut filters =
         vec![SourceItem { id: "all".into(), label: "All".into(), found: true, count: report.games.len() as i32, on: true }];
-    for src in [Source::Steam, Source::Epic, Source::Gog, Source::Manual] {
+    for src in Source::ALL {
         let n = count(src);
         if n > 0 {
             filters.push(SourceItem { id: source_id(src).into(), label: src.label().into(), found: true, count: n as i32, on: true });

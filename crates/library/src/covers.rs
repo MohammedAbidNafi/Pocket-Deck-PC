@@ -53,11 +53,12 @@ pub fn prepare(dir: &Path, key: &str, art: &Path) -> Option<PathBuf> {
     Some(cover)
 }
 
-/// Downloads art the launcher only knows by URL, once, into `<dir>/art/`. Only Epic's CDN is
-/// allowed. Returns the local file (with an extension matching its real format).
+/// Downloads art known only by URL, once, into `<dir>/art/`. Only Epic's and SteamGridDB's
+/// image servers are allowed. Returns the local file (with an extension matching its real format).
 pub fn fetch(dir: &Path, key: &str, url: &str) -> Option<PathBuf> {
     let host = url.strip_prefix("https://")?.split('/').next()?;
-    if !(host == "epicgames.com" || host.ends_with(".epicgames.com")) {
+    let allowed = ["epicgames.com", "steamgriddb.com"];
+    if !allowed.iter().any(|a| host == *a || host.ends_with(&format!(".{a}"))) {
         return None;
     }
     let base = dir.join("art").join(file_name(key)).with_extension("");

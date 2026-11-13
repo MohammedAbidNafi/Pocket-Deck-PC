@@ -4020,9 +4020,11 @@ name = "pocketdeck-library"
 version = "0.1.0"
 dependencies = [
  "image",
+ "roxmltree",
  "serde",
  "serde_json",
  "ureq",
+ "windows-sys 0.61.2",
  "winreg",
 ]
 
