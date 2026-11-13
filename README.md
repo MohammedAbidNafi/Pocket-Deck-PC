@@ -47,6 +47,13 @@ Download `PocketDeck-<version>.exe` from [**Releases**](https://github.com/Moham
 
 Full notes and downloads for every version are on the [Releases page](https://github.com/MohammedAbidNafi/Pocket-Deck-PC/releases).
 
+### 0.2.0
+
+- **Match your phone's screen:** while a phone streams, the PC switches to a virtual display at the phone's exact resolution and refresh rate, then puts your monitors back as they were when the stream ends. It's off whenever nobody is streaming, so Windows never boots onto it. Turn it on in **Settings → Streaming host** (one administrator prompt); the same switch removes it.
+- **Xbox app and Microsoft Store games:** PC Game Pass and other Store games now show up in your library with their artwork.
+- **Other games on your PC:** games from the EA app, Ubisoft Connect, Battle.net, Riot, itch or a standalone installer are found among your installed programs, without picking each `.exe` by hand.
+- **Covers for every game:** games without box art from their launcher get a cover from [SteamGridDB](https://www.steamgriddb.com).
+
 ### 0.1.0
 
 - First release: Sunshine setup and health checks, the game library (Steam, Epic Games, GOG and games you add) synced to your phone with covers, pairing a phone by scanning a QR code, a paired-device list, tray mode and start with Windows.
