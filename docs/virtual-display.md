@@ -18,7 +18,7 @@ and switches it on, at the phone's mode, just before the stream starts.
 |---|---|---|
 | Driver: [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) 25.7.23, MIT, SignPath-signed. Pinned by SHA-256 in `vdd.rs`, installed unchanged. | Windows driver store, device `Root\MttVDD` | — |
 | Service `PocketDeckDisplay` (`PocketDeckDisplay.exe --display service`): owns the device, hands out leases, serves the phone. | `%ProgramFiles%\PocketDeck\PocketDeckDisplay.exe` (a copy of `PocketDeck.exe`) | LocalSystem |
-| Layout helper (`--display arrange …` / `--display restore`): makes the virtual display the only screen. | started by the service in the signed-in session | SYSTEM, console session |
+| Layout helper (`--display arrange …` / `--display restore`): makes the virtual display the main screen, with the PC's own screens beside it. | started by the service in the signed-in session | SYSTEM, console session |
 | Setup / removal (`--display setup <zip>` / `--display remove`) | Settings → Streaming host → "Match your phone's screen" | elevated, one UAC prompt |
 
 Setup records what it did under `HKLM\SOFTWARE\PocketDeck\Display` (`OwnDevice`, `WasEnabled`, `OwnSettings`,
@@ -31,7 +31,7 @@ switching on, the service adds the phone's mode to the file if it's missing. The
 starts, so a new mode means switching it off and on again.
 
 Sunshine needs no configuration. With `output_name` empty (the default) it captures the primary display, and the
-only active display is the primary one. A Sunshine set to a specific `output_name` keeps capturing that output.
+virtual display is made the primary one (and games opened from the phone go there too). A Sunshine set to a specific `output_name` keeps capturing that output.
 
 ## Lifecycle
 
@@ -39,12 +39,12 @@ only active display is the primary one. A Sunshine set to a specific `output_nam
 phone                              PC service                                   Windows
 prepare(w,h,fps) ───────────────▶  add mode to vdd_settings.xml (if new)
                                    enable device (restart if mode was new) ───▶ virtual monitor appears
-                                   helper in user session: only display,
-                                   mode w×h@fps ──────────────────────────────▶ physical screens go dark
+                                   helper in user session: main display,
+                                   mode w×h@fps ──────────────────────────────▶ becomes primary; PC screens stay on
 ◀── 200 ready (lease 90 s)
 Moonlight launch/resume ────────────────────────────────────────────────────▶ Sunshine captures primary = virtual
 keepalive every 20 s ───────────▶  lease renewed
-release (stream ends) ──────────▶  disable device; helper: restore layout ────▶ physical screens come back
+release (stream ends) ──────────▶  disable device; helper: restore layout ────▶ usual layout and main screen back
 ```
 
 The display is switched off when any of these happens:
@@ -83,7 +83,7 @@ Answers:
 ```
 
 - `note` on `ready`: the display is on but something didn't go to plan, such as nobody being signed in, so it
-  couldn't be made the only screen. The stream still works.
+  couldn't be made the main screen. The stream still works, showing the PC's own main screen.
 - Limits: mode 320–7680 × 240–4320 at 24–480 Hz, otherwise `failed`. Headers ≤ 8 KB, body ≤ 4 KB.
 
 ## Phone rules
@@ -109,7 +109,8 @@ The service logs to `%ProgramData%\PocketDeck\display.log`.
 ## Known limits
 
 - One phone at a time: a second `prepare` re-arranges the display for the newer phone.
-- While streaming, the PC's own monitors are off (the virtual display is the only one). They come back when the
-  display is released.
+- While streaming, the PC's own monitors stay on, moved to the right of the virtual display, which is the main
+  screen. A game that was already open on a PC monitor stays there, so the phone sees it only once it's moved or
+  restarted. The usual layout (and main screen) come back when the display is released.
 - If the phone cancels while the display is still turning on, the PC switches it off when the lease runs out
   (90 s), not straight away.

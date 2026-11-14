@@ -450,7 +450,7 @@ component DisplayRow inherits SettingRow {
         : d.outdated ? "Set up by another version of PocketDeck. Update it to keep it working. Asks for administrator permission."
         : !d.running ? "The virtual display service isn't running. Update it to repair it."
         : d.in-use ? "In use. Your phone is streaming on the virtual display."
-        : "Games run at your phone's resolution. This PC's screen turns off while you stream and comes back after.";
+        : "Games run at your phone's resolution on a screen of their own. This PC's screens stay on while you stream.";
     value: root.busy ? "" : d.installed && (d.outdated || !d.running) ? "Update" : "";
     icon: Icons.phone;
     has-toggle: true;
