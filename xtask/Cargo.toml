@@ -9,4 +9,4 @@ publish = false
 [dependencies]
 ico = "0.6.0"
 # Same version Slint uses, so it is only built once.
-resvg = { version = "0.47", default-features = false }
+resvg = { version = "0.50", default-features = false }
