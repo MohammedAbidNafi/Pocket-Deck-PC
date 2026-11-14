@@ -19,7 +19,7 @@ It's built to be light: pure Rust with a [Slint](https://slint.dev) interface dr
 - **On your phone with covers:** every game becomes a Sunshine app with its cover art, so it shows up in PocketDeck's library on the phone. PocketDeck only ever edits the apps it created; anything you made in Sunshine yourself is left alone.
 - **Pair with one scan:** **Devices → Pair a phone** shows a QR code. Scan it with PocketDeck on your phone (**Settings → PC streaming → Scan PC's code**) and it's paired. No PIN to type into Sunshine. The code includes the PC's certificate fingerprint, so the phone only pairs with the PC whose screen showed it. See [docs/pair-with-scan.md](docs/pair-with-scan.md).
 - **Paired phones:** see every device that can stream from this PC and unpair any of them.
-- **Match your phone's screen:** **Settings → Streaming host** adds a virtual display (one administrator prompt) that is switched on at your phone's exact resolution and refresh rate just before a stream starts, and off again when it ends. It's off the rest of the time, so Windows never boots onto it or opens apps on it. While you stream, the PC's own screens are off. See [docs/virtual-display.md](docs/virtual-display.md).
+- **Match your phone's screen:** **Settings → Streaming host** adds a virtual display (one administrator prompt) that is switched on at your phone's exact resolution and refresh rate just before a stream starts, and off again when it ends. It's off the rest of the time, so Windows never boots onto it or opens apps on it. While you stream it's the main screen, where games open and what the phone sees; the PC's own screens stay on beside it. See [docs/virtual-display.md](docs/virtual-display.md).
 - **Lives in the tray:** starts with Windows (optional) and keeps running when the window is closed. The window is only built while it's open.
 - **Same look and sound as the phone:** guided setup, accent colours, tile shapes and sizes, and the same console-style UI sounds.
 
@@ -46,6 +46,11 @@ Download `PocketDeck-<version>.exe` from [**Releases**](https://github.com/Moham
 ## Release notes
 
 Full notes and downloads for every version are on the [Releases page](https://github.com/MohammedAbidNafi/Pocket-Deck-PC/releases).
+
+### 0.2.1
+
+- **Your monitors stay on while you stream:** the virtual display now joins your desktop as the main screen, where the phone's game opens and what the phone sees, instead of replacing your monitors. They stay on beside it, and your usual layout and main screen come back when the stream ends.
+- **Pairing when the phone retries:** if your phone already has a pairing request waiting (from an earlier attempt), the PC turns that one down and answers the new one, so a retry no longer gets stuck behind its own old request.
 
 ### 0.2.0
 
