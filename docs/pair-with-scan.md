@@ -55,7 +55,7 @@ Rules:
 Sunshine 2026 (checked on 2026.914) changed PIN entry: `GET /api/pin` lists waiting devices as
 `{"pairings":[{"id":"<32 hex>","address":"<phone IP>","name":"roth"}]}` (Moonlight clients always send `roth`),
 `POST /api/pin {pairing_id, pin, name}` answers `{"status":true}`, and `DELETE /api/pin {pairing_id}` turns one down.
-Requests stay listed after the client gives up, so the PC only answers a request that **appeared after the code went up**.
+Requests stay listed after the client gives up, so the PC only answers a request that **appeared after the code went up**, and of those the **newest** (Sunshine's list has no order, so the PC remembers when it first saw each one). Older requests still waiting from the same address (an earlier attempt, or one from before the code) are turned down (`DELETE /api/pin`) so the new one goes first. Requests from other addresses are left alone. A retry from the same phone (same address) after the PIN went in also gets the PIN; requests from any other device are then ignored.
 Older Sunshine (no `GET /api/pin`) falls back to polling `POST /api/pin {pin, name}`.
 
 1. `crates/sunshine/src/api.rs`: `pending_pairings`, `submit_pin`, `submit_pin_legacy`, `cancel_pairing`, `clients`, `unpair_client`, `random_pin`.
@@ -97,7 +97,7 @@ Older Sunshine (no `GET /api/pin`) falls back to polling `POST /api/pin {pin, na
 
 - Phone name in Sunshine: v1 sends `"PocketDeck phone"`. Later the phone could put its name in the pairing request,
   or the PC could rename the client via the API if the pinned Sunshine supports it.
-- Two phones scanning the same code at once: the PC answers the first new request only; the second gets PIN_WRONG.
+- Two phones scanning the same code at once: the PC answers the newest request at the time; once the PIN has gone in, the other phone's request is ignored and times out.
 
 ## Notes for the phone side
 

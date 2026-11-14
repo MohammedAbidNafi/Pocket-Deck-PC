@@ -146,8 +146,13 @@ fn session(rx: &Receiver<PairCommand>, post: &dyn Fn(PairUpdate)) -> Option<Pair
     let shown = Instant::now();
     let lifetime = Duration::from_secs(CODE_LIFETIME_SECS);
     let mut last_left = CODE_LIFETIME_SECS as u32;
-    // When the PIN went in.
+    // When the PIN last went in.
     let mut entered: Option<Instant> = None;
+    // Request IDs in the order they first showed up, and the ones the PIN went in for.
+    let mut seen: Vec<String> = Vec::new();
+    let mut answered: HashSet<String> = HashSet::new();
+    // The address of the phone the PIN went in for.
+    let mut phone: Option<String> = None;
 
     loop {
         match rx.recv_timeout(Duration::from_millis(500)) {
@@ -162,51 +167,80 @@ fn session(rx: &Receiver<PairCommand>, post: &dyn Fn(PairUpdate)) -> Option<Pair
             Err(RecvTimeoutError::Disconnected) => return None,
         }
 
-        match entered {
-            None => {
-                if shown.elapsed() >= lifetime {
-                    post(PairUpdate::Expired);
+        if entered.is_none() {
+            if shown.elapsed() >= lifetime {
+                post(PairUpdate::Expired);
+                return None;
+            }
+            let left = (lifetime - shown.elapsed()).as_secs() as u32;
+            if left != last_left {
+                last_left = left;
+                post(PairUpdate::SecondsLeft(left));
+            }
+        }
+
+        // The newest request from the phone gets the PIN; its older ones are turned down. This
+        // keeps going after the PIN went in, so a phone that retried still gets through.
+        match &waiting_before {
+            Some(before) => match api.pending_pairings() {
+                Ok(pending) => {
+                    pairing::note_seen(&pending, &mut seen);
+                    let choice = pairing::choose(&pending, before, &seen);
+                    // One code pairs one phone: once the PIN went in, only that phone's retries count.
+                    let ours = |r: &&pocketdeck_sunshine::api::PendingPairing| {
+                        !answered.contains(&r.id) && phone.as_ref().is_none_or(|a| *a == r.address)
+                    };
+                    if let Some(request) = choice.answer.filter(ours) {
+                        for old in &choice.cancel {
+                            crate::log::line(format!("pairing: turning down an older request from {}", old.address));
+                            if let Err(e) = api.cancel_pairing(&old.id) {
+                                crate::log::line(format!("pairing: turning down {}: {e}", old.id));
+                            }
+                        }
+                        crate::log::line(format!("pairing: request from {}", request.address));
+                        match api.submit_pin(&request.id, &code.pin, &device_name) {
+                            Ok(true) => {
+                                answered.insert(request.id.clone());
+                                phone = Some(request.address.clone());
+                                if entered.is_none() {
+                                    post(PairUpdate::Pairing);
+                                }
+                                entered = Some(Instant::now());
+                            }
+                            Ok(false) if entered.is_none() => {
+                                return fail("The streaming engine turned the pairing down. Show a new code and scan again.".into());
+                            }
+                            Err(e) if entered.is_none() => return fail(e.to_string()),
+                            // Already pairing with an earlier request: keep waiting on that one.
+                            other => crate::log::line(format!("pairing: retry not accepted: {other:?}")),
+                        }
+                    }
+                }
+                Err(e) if entered.is_none() => return fail(e.to_string()),
+                Err(_) => {}
+            },
+            // Older Sunshine: no list, so the PIN goes to whoever is waiting.
+            None if entered.is_none() => match api.submit_pin_legacy(&code.pin, &device_name) {
+                Ok(true) => {
+                    entered = Some(Instant::now());
+                    post(PairUpdate::Pairing);
+                }
+                // It says no while nobody is waiting yet.
+                Ok(false) => {}
+                Err(e) => return fail(e.to_string()),
+            },
+            None => {}
+        }
+
+        if let Some(at) = entered {
+            if let Ok(now) = api.clients() {
+                if let Some(c) = pairing::new_client(&now, &clients_before) {
+                    post(PairUpdate::Paired { name: c.name.clone() });
                     return None;
                 }
-                let left = (lifetime - shown.elapsed()).as_secs() as u32;
-                if left != last_left {
-                    last_left = left;
-                    post(PairUpdate::SecondsLeft(left));
-                }
-                let accepted = match &waiting_before {
-                    Some(before) => match api.pending_pairings() {
-                        Ok(pending) => match pairing::our_request(&pending, before) {
-                            Some(request) => {
-                                crate::log::line(format!("pairing: request from {}", request.address));
-                                api.submit_pin(&request.id, &code.pin, &device_name)
-                            }
-                            None => continue,
-                        },
-                        Err(e) => Err(e),
-                    },
-                    None => api.submit_pin_legacy(&code.pin, &device_name),
-                };
-                match accepted {
-                    Ok(true) => {
-                        entered = Some(Instant::now());
-                        post(PairUpdate::Pairing);
-                    }
-                    // Legacy Sunshine says no while nobody is waiting yet.
-                    Ok(false) if waiting_before.is_none() => {}
-                    Ok(false) => return fail("The streaming engine turned the pairing down. Show a new code and scan again.".into()),
-                    Err(e) => return fail(e.to_string()),
-                }
             }
-            Some(at) => {
-                if let Ok(now) = api.clients() {
-                    if let Some(c) = pairing::new_client(&now, &clients_before) {
-                        post(PairUpdate::Paired { name: c.name.clone() });
-                        return None;
-                    }
-                }
-                if at.elapsed() > Duration::from_secs(20) {
-                    return fail("Your phone didn't finish pairing. Show a new code and scan it again.".into());
-                }
+            if at.elapsed() > Duration::from_secs(20) {
+                return fail("Your phone didn't finish pairing. Show a new code and scan it again.".into());
             }
         }
     }

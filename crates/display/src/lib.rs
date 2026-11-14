@@ -7,7 +7,7 @@
 //! The pieces:
 //! - [`vdd`]: the driver release PocketDeck installs, and its resolution list.
 //! - [`device`]: finding the virtual display adapter and switching it on and off (admin only).
-//! - [`topology`]: making it the only screen, at the phone's mode (runs in the signed-in session).
+//! - [`topology`]: making it the main screen at the phone's mode, beside the PC's own (runs in the signed-in session).
 //! - [`service`]: the Windows service that owns all of that and hands out leases.
 //! - [`remote`]: the LAN endpoint the phone calls before it streams.
 //! - [`pipe`]: the local control channel (`PocketDeck.exe --display on 1920 1080 60` and friends).

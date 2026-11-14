@@ -1,14 +1,14 @@
-//! Arranging the screens: the virtual display as the only active one, at the phone's mode, and
-//! back to normal afterwards.
+//! Arranging the screens: the virtual display as the primary one, at the phone's mode, with the
+//! PC's own screens left on beside it; and back to normal afterwards.
 //!
 //! These calls act on the signed-in session's desktop, so they can't run from the service
 //! (session 0). The service starts `PocketDeckDisplay.exe --display arrange …` in the console
 //! session for them instead (see `session.rs`). Changing the display layout needs no admin.
 //!
-//! Sunshine captures the primary display when no output is configured, and the only active
-//! display is the primary one, so nothing in Sunshine's own settings has to change. When the
+//! Sunshine captures the primary display when no output is configured, so nothing in Sunshine's
+//! own settings has to change, and a game started from the phone opens there too. When the
 //! virtual display is switched off again, Windows puts back the layout it remembered for the
-//! physical screens; [`restore`] asks for that explicitly as well.
+//! physical screens (primary included); [`restore`] asks for that explicitly as well.
 
 use crate::{Mode, from_wide, wide};
 use std::time::{Duration, Instant};
@@ -17,13 +17,13 @@ use windows_sys::Win32::Devices::Display::{
     DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME, DISPLAYCONFIG_DEVICE_INFO_HEADER, DISPLAYCONFIG_MODE_INFO,
     DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SOURCE_DEVICE_NAME, DISPLAYCONFIG_TARGET_DEVICE_NAME,
     DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QDC_ALL_PATHS, QDC_ONLY_ACTIVE_PATHS, QueryDisplayConfig,
-    SDC_ALLOW_CHANGES, SDC_ALLOW_PATH_ORDER_CHANGES, SDC_APPLY, SDC_SAVE_TO_DATABASE, SDC_TOPOLOGY_SUPPLIED,
-    SDC_USE_DATABASE_CURRENT, SDC_USE_SUPPLIED_DISPLAY_CONFIG, SetDisplayConfig,
+    SDC_ALLOW_CHANGES, SDC_APPLY, SDC_SAVE_TO_DATABASE, SDC_TOPOLOGY_EXTEND, SDC_USE_DATABASE_CURRENT,
+    SDC_USE_SUPPLIED_DISPLAY_CONFIG, SetDisplayConfig,
 };
 use windows_sys::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS, LUID, POINTL};
 use windows_sys::Win32::Graphics::Gdi::{
     CDS_UPDATEREGISTRY, ChangeDisplaySettingsExW, DEVMODEW, DISP_CHANGE_SUCCESSFUL, DISPLAYCONFIG_PATH_ACTIVE,
-    DISPLAYCONFIG_PATH_MODE_IDX_INVALID, DM_DISPLAYFREQUENCY, DM_PELSHEIGHT, DM_PELSWIDTH, ENUM_CURRENT_SETTINGS,
+    DM_DISPLAYFREQUENCY, DM_PELSHEIGHT, DM_PELSWIDTH, ENUM_CURRENT_SETTINGS,
     EnumDisplaySettingsW,
 };
 
@@ -109,42 +109,46 @@ fn vdd_path(instance_id: &str, flags: u32) -> Result<Option<DISPLAYCONFIG_PATH_I
     }))
 }
 
-/// Makes the virtual display the only active screen, at `mode`. Waits up to `limit` for it to
-/// show up after being switched on. Returns its GDI name (`\\.\DISPLAY5`).
+/// Makes the virtual display the primary screen at `mode`, with the PC's own screens staying on
+/// beside it (to its right). Waits up to `limit` for it to show up after being switched on.
+/// Returns its GDI name (`\\.\DISPLAY5`).
+///
+/// Primary matters twice over: Sunshine captures the primary display, and new windows (the game
+/// the phone starts) open there.
 pub fn arrange(instance_id: &str, mode: Mode, limit: Duration) -> Result<String, String> {
     let start = Instant::now();
-    let mut path = loop {
-        if let Some(p) = vdd_path(instance_id, QDC_ALL_PATHS)? {
-            break p;
+    loop {
+        if vdd_path(instance_id, QDC_ALL_PATHS)?.is_some() {
+            break;
         }
         if start.elapsed() >= limit {
             return Err("The virtual display didn't appear in time.".into());
         }
         std::thread::sleep(Duration::from_millis(200));
-    };
+    }
 
-    // Windows normally adds the new monitor to the desktop by itself. Then keep only its active
-    // path (with its own modes, moved to 0,0 so it's primary). Otherwise, hand Windows the bare
-    // topology and let it pick modes from its database.
+    // Windows normally adds the new monitor to the desktop by itself. If it doesn't, ask it to
+    // extend the desktop onto every connected screen, then try again.
     let mut done = false;
-    for _ in 0..15 {
-        if keep_only_active(instance_id)? {
-            done = true;
+    for attempt in 0..2 {
+        for _ in 0..15 {
+            if make_primary(instance_id, mode)? {
+                done = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        if done || attempt == 1 {
             break;
         }
-        std::thread::sleep(Duration::from_millis(200));
+        // SAFETY: no paths or modes, as SDC_TOPOLOGY_EXTEND requires.
+        let r = unsafe { SetDisplayConfig(0, std::ptr::null(), 0, std::ptr::null(), SDC_APPLY | SDC_TOPOLOGY_EXTEND) };
+        if r != ERROR_SUCCESS as i32 {
+            return Err(format!("Windows wouldn't add the virtual display to the desktop ({r})."));
+        }
     }
     if !done {
-        path.flags = DISPLAYCONFIG_PATH_ACTIVE;
-        path.sourceInfo.Anonymous.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-        path.targetInfo.Anonymous.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
-        // SAFETY: one valid path, no modes, as SDC_TOPOLOGY_SUPPLIED requires.
-        let r = unsafe {
-            SetDisplayConfig(1, &path, 0, std::ptr::null(), SDC_APPLY | SDC_TOPOLOGY_SUPPLIED | SDC_ALLOW_PATH_ORDER_CHANGES)
-        };
-        if r != ERROR_SUCCESS as i32 {
-            return Err(format!("Windows wouldn't make the virtual display the only screen ({r})."));
-        }
+        return Err("The virtual display didn't join the desktop.".into());
     }
 
     // Find it again among the active paths for its GDI name, then set the mode.
@@ -162,47 +166,86 @@ pub fn arrange(instance_id: &str, mode: Mode, limit: Duration) -> Result<String,
     Ok(name)
 }
 
-/// When the virtual display is among the active paths: applies a layout of that path alone, at
-/// 0,0. `Ok(false)`: it isn't active (yet).
-fn keep_only_active(instance_id: &str) -> Result<bool, String> {
-    let (paths, modes) = query(QDC_ONLY_ACTIVE_PATHS)?;
-    let Some(mut path) = paths.into_iter().find(|p| {
+/// True when a screen other than the virtual display is connected (active or not).
+fn other_screens_connected(instance_id: &str) -> Result<bool, String> {
+    let (paths, _) = query(QDC_ALL_PATHS)?;
+    Ok(paths.iter().any(|p| {
+        p.targetInfo.targetAvailable != 0
+            && !belongs_to(instance_id, &adapter_path(p.targetInfo.adapterId), &target_path(p.targetInfo.adapterId, p.targetInfo.id))
+    }))
+}
+
+/// Where the PC's own screens go once the virtual display (`width` wide) takes 0,0: moved as one
+/// block, keeping their arrangement, so that block's top-left corner sits at the virtual
+/// display's top-right corner.
+pub fn beside(width: u32, others: &[(i32, i32)]) -> Vec<(i32, i32)> {
+    let min_x = others.iter().map(|p| p.0).min().unwrap_or(0);
+    let min_y = others.iter().map(|p| p.1).min().unwrap_or(0);
+    others.iter().map(|&(x, y)| (x - min_x + width as i32, y - min_y)).collect()
+}
+
+/// When the virtual display is among the active paths: applies the current layout with it as
+/// the primary display at `mode` and every other screen moved beside it. `Ok(false)`: it isn't
+/// active (yet).
+fn make_primary(instance_id: &str, mode: Mode) -> Result<bool, String> {
+    let (mut paths, mut modes) = query(QDC_ONLY_ACTIVE_PATHS)?;
+    let Some(vdd) = paths.iter().position(|p| {
         belongs_to(instance_id, &adapter_path(p.targetInfo.adapterId), &target_path(p.targetInfo.adapterId, p.targetInfo.id))
     }) else {
         return Ok(false);
     };
-    // Only this path's two modes, re-indexed.
-    let mut kept: Vec<DISPLAYCONFIG_MODE_INFO> = Vec::new();
+    // Alone: Windows applied a remembered "virtual display only" layout (an older PocketDeck made
+    // those). Bring the PC's screens back first; this layout is saved over the old one below.
+    if paths.len() == 1 && other_screens_connected(instance_id)? {
+        // SAFETY: no paths or modes, as SDC_TOPOLOGY_EXTEND requires.
+        let r = unsafe { SetDisplayConfig(0, std::ptr::null(), 0, std::ptr::null(), SDC_APPLY | SDC_TOPOLOGY_EXTEND) };
+        if r != ERROR_SUCCESS as i32 {
+            return Err(format!("Windows wouldn't turn the PC's screens back on ({r})."));
+        }
+        return Ok(false);
+    }
     // SAFETY: without QDC_VIRTUAL_MODE_AWARE the union holds plain mode indexes.
-    let (source_idx, target_idx) = unsafe { (path.sourceInfo.Anonymous.modeInfoIdx, path.targetInfo.Anonymous.modeInfoIdx) };
-    if let Some(m) = modes.get(source_idx as usize) {
-        let mut m = *m;
-        // A source mode's union holds sourceMode (writing a union field needs no unsafe).
-        m.Anonymous.sourceMode.position = POINTL { x: 0, y: 0 };
-        path.sourceInfo.Anonymous.modeInfoIdx = kept.len() as u32;
-        kept.push(m);
-    } else {
-        path.sourceInfo.Anonymous.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+    let source_of = |p: &DISPLAYCONFIG_PATH_INFO| unsafe { p.sourceInfo.Anonymous.modeInfoIdx } as usize;
+    let vdd_source = source_of(&paths[vdd]);
+    if vdd_source >= modes.len() {
+        return Ok(false);
     }
-    if let Some(m) = modes.get(target_idx as usize) {
-        path.targetInfo.Anonymous.modeInfoIdx = kept.len() as u32;
-        kept.push(*m);
-    } else {
-        path.targetInfo.Anonymous.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+
+    // Every other screen's source mode, once each (cloned screens share one).
+    let mut others: Vec<usize> = Vec::new();
+    for (i, p) in paths.iter().enumerate() {
+        let s = source_of(p);
+        if i != vdd && s < modes.len() && s != vdd_source && !others.contains(&s) {
+            others.push(s);
+        }
     }
-    path.flags = DISPLAYCONFIG_PATH_ACTIVE;
-    // SAFETY: one path and the modes it points at.
+    // SAFETY: these indexes point at source modes, whose union holds sourceMode.
+    let positions: Vec<(i32, i32)> = others
+        .iter()
+        .map(|&s| unsafe { (modes[s].Anonymous.sourceMode.position.x, modes[s].Anonymous.sourceMode.position.y) })
+        .collect();
+    for (&s, (x, y)) in others.iter().zip(beside(mode.width, &positions)) {
+        modes[s].Anonymous.sourceMode.position = POINTL { x, y };
+    }
+    modes[vdd_source].Anonymous.sourceMode.position = POINTL { x: 0, y: 0 };
+    modes[vdd_source].Anonymous.sourceMode.width = mode.width;
+    modes[vdd_source].Anonymous.sourceMode.height = mode.height;
+    for p in paths.iter_mut() {
+        p.flags |= DISPLAYCONFIG_PATH_ACTIVE;
+    }
+
+    // SAFETY: the paths and modes Windows gave us, adjusted in place.
     let r = unsafe {
         SetDisplayConfig(
-            1,
-            &path,
-            kept.len() as u32,
-            kept.as_ptr(),
+            paths.len() as u32,
+            paths.as_ptr(),
+            modes.len() as u32,
+            modes.as_ptr(),
             SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES | SDC_SAVE_TO_DATABASE,
         )
     };
     if r != ERROR_SUCCESS as i32 {
-        return Err(format!("Windows wouldn't make the virtual display the only screen ({r})."));
+        return Err(format!("Windows wouldn't make the virtual display the main screen ({r})."));
     }
     Ok(true)
 }
@@ -272,6 +315,15 @@ mod tests {
         assert!(!belongs_to(r"ROOT\DISPLAY\0000", adapter, ""));
         // 0002 must not match 00021.
         assert!(!belongs_to(r"ROOT\DISPLAY\000", adapter, ""));
+    }
+
+    #[test]
+    fn puts_the_pc_screens_beside_the_virtual_display() {
+        // Two 1440p screens, the primary on the right: -2560,-6 and 0,0.
+        assert_eq!(beside(2400, &[(-2560, -6), (0, 0)]), vec![(2400, 0), (4960, 6)]);
+        // One screen at the origin.
+        assert_eq!(beside(1920, &[(0, 0)]), vec![(1920, 0)]);
+        assert!(beside(1920, &[]).is_empty());
     }
 
     #[test]

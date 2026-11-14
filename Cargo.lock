@@ -4005,7 +4005,7 @@ dependencies = [
 
 [[package]]
 name = "pocketdeck-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "pocketdeck-library",
  "pocketdeck-sunshine",
@@ -4017,7 +4017,7 @@ dependencies = [
 
 [[package]]
 name = "pocketdeck-display"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "pocketdeck-sunshine",
  "rustls",
@@ -4030,7 +4030,7 @@ dependencies = [
 
 [[package]]
 name = "pocketdeck-library"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "image",
  "roxmltree",
@@ -4043,7 +4043,7 @@ dependencies = [
 
 [[package]]
 name = "pocketdeck-pc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "pocketdeck-core",
  "pocketdeck-display",
@@ -4060,7 +4060,7 @@ dependencies = [
 
 [[package]]
 name = "pocketdeck-sunshine"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "rustls",
  "serde",
@@ -6926,7 +6926,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ico",
  "resvg",

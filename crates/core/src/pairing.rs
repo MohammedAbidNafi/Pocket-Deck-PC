@@ -59,10 +59,40 @@ fn encode(text: &str) -> String {
     out
 }
 
-/// The waiting pairing request that belongs to the phone that scanned the code: one that wasn't
-/// already waiting when the code went up (those are someone else's, e.g. Sunshine's own PIN page).
-pub fn our_request<'a>(pending: &'a [PendingPairing], waiting_before: &HashSet<String>) -> Option<&'a PendingPairing> {
-    pending.iter().find(|p| !waiting_before.contains(&p.id))
+/// What to do with the requests waiting in Sunshine.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Choice<'a> {
+    /// The request to enter the PIN for.
+    pub answer: Option<&'a PendingPairing>,
+    /// Older requests from the same phone, to turn down so the new one goes first.
+    pub cancel: Vec<&'a PendingPairing>,
+}
+
+/// Picks the request that belongs to the phone that scanned the code: the newest one that wasn't
+/// already waiting when the code went up. Sunshine keeps requests listed after the phone gives
+/// up, so the same phone may have older ones waiting (from before the code, or from an attempt
+/// it retried); those are turned down. Requests from other devices are left alone (they may be
+/// someone using Sunshine's own PIN page).
+///
+/// `seen` holds request IDs in the order they were first seen. Sunshine's list has no order of
+/// its own, so "newest" means last to appear there.
+pub fn choose<'a>(pending: &'a [PendingPairing], waiting_before: &HashSet<String>, seen: &[String]) -> Choice<'a> {
+    let order = |p: &PendingPairing| seen.iter().position(|id| *id == p.id).unwrap_or(usize::MAX);
+    let answer = pending.iter().filter(|p| !waiting_before.contains(&p.id)).max_by_key(|p| order(p));
+    let cancel = match answer {
+        Some(a) => pending.iter().filter(|p| p.id != a.id && p.address == a.address).collect(),
+        None => Vec::new(),
+    };
+    Choice { answer, cancel }
+}
+
+/// Adds the IDs in `pending` that haven't been seen yet to `seen`, in the order given.
+pub fn note_seen(pending: &[PendingPairing], seen: &mut Vec<String>) {
+    for p in pending {
+        if !seen.contains(&p.id) {
+            seen.push(p.id.clone());
+        }
+    }
 }
 
 /// A device in `now` that wasn't in `before`: the phone that just paired.
@@ -189,11 +219,53 @@ mod tests {
         assert_eq!(encode("Zoë-PC_1.~"), "Zo%C3%AB-PC_1.~");
     }
 
+    fn pending_from(id: &str, address: &str) -> PendingPairing {
+        PendingPairing { id: id.into(), address: address.into(), name: "roth".into() }
+    }
+
+    fn ids(list: &[&PendingPairing]) -> Vec<String> {
+        list.iter().map(|p| p.id.clone()).collect()
+    }
+
     #[test]
-    fn ignores_requests_that_were_already_waiting() {
+    fn waits_while_only_old_requests_are_there() {
         let before: HashSet<String> = ["old".to_string()].into();
-        assert_eq!(our_request(&[pending("old")], &before), None);
-        assert_eq!(our_request(&[pending("old"), pending("new")], &before).map(|p| p.id.as_str()), Some("new"));
+        let list = [pending("old")];
+        assert_eq!(choose(&list, &before, &["old".into()]), Choice { answer: None, cancel: vec![] });
+    }
+
+    #[test]
+    fn a_new_request_goes_first_and_the_same_phones_old_one_is_turned_down() {
+        let before: HashSet<String> = ["old".to_string()].into();
+        let list = [pending("new"), pending("old")];
+        let c = choose(&list, &before, &["old".into(), "new".into()]);
+        assert_eq!(c.answer.map(|p| p.id.as_str()), Some("new"));
+        assert_eq!(ids(&c.cancel), ["old"]);
+    }
+
+    #[test]
+    fn a_retry_beats_the_attempt_it_replaces() {
+        // Both appeared after the code went up; "second" was seen later.
+        let list = [pending("second"), pending("first")];
+        let c = choose(&list, &HashSet::new(), &["first".into(), "second".into()]);
+        assert_eq!(c.answer.map(|p| p.id.as_str()), Some("second"));
+        assert_eq!(ids(&c.cancel), ["first"]);
+    }
+
+    #[test]
+    fn other_devices_are_left_alone() {
+        let before: HashSet<String> = ["laptop".to_string()].into();
+        let list = [pending_from("laptop", "192.168.1.50"), pending_from("phone", "192.168.1.20")];
+        let c = choose(&list, &before, &["laptop".into(), "phone".into()]);
+        assert_eq!(c.answer.map(|p| p.id.as_str()), Some("phone"));
+        assert!(c.cancel.is_empty());
+    }
+
+    #[test]
+    fn remembers_first_seen_order() {
+        let mut seen = vec!["a".to_string()];
+        note_seen(&[pending("b"), pending("a"), pending("c")], &mut seen);
+        assert_eq!(seen, ["a", "b", "c"]);
     }
 
     #[test]

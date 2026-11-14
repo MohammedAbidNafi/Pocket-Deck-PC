@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reply {
     /// On, arranged at the phone's mode. `note` says what didn't go to plan (the display is on
-    /// but couldn't be made the only screen, say).
+    /// but couldn't be made the main screen, say).
     Ready { mode: Mode, note: Option<String> },
     /// On under a lease, with this many seconds left.
     On { mode: Mode, seconds_left: u64 },
@@ -62,7 +62,7 @@ pub trait Backend: Send + Sync {
     fn ensure_mode(&self, mode: Mode) -> Result<bool, String>;
     fn set_enabled(&self, on: bool) -> Result<(), String>;
     fn wait_for(&self, state: State, limit: Duration) -> State;
-    /// Makes the display the only screen at `mode`, in the signed-in session.
+    /// Makes the display the main screen at `mode`, in the signed-in session.
     fn arrange(&self, mode: Mode) -> Result<(), String>;
     /// Puts the remembered layout back, in the signed-in session.
     fn restore(&self) -> Result<(), String>;
