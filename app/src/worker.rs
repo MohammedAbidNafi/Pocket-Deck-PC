@@ -12,6 +12,10 @@ pub enum Command {
     /// Install (or update) the virtual display: driver, service, firewall rule.
     DisplaySetup,
     DisplayRemove,
+    /// Switch the virtual display feature on or off (no admin: the service does it).
+    DisplayAllow(bool),
+    /// Switch play from anywhere on or off (the service does it).
+    RemoteAllow(bool),
 }
 
 /// What the UI thread hears back.
@@ -123,6 +127,18 @@ fn run(rx: Receiver<Command>, on_update: fn(Update)) {
             Command::Restart => do_restart(on_update),
             Command::DisplaySetup => do_display_setup(on_update),
             Command::DisplayRemove => do_display_remove(on_update),
+            Command::RemoteAllow(on) => {
+                let error = pocketdeck_display::pipe::request(if on { "remote on" } else { "remote off" })
+                    .err()
+                    .map(|e| format!("Couldn't switch play from anywhere {}: {e}", if on { "on" } else { "off" }));
+                finish(on_update, "display", error);
+            }
+            Command::DisplayAllow(on) => {
+                let error = pocketdeck_display::pipe::request(if on { "allow" } else { "disallow" })
+                    .err()
+                    .map(|e| format!("Couldn't switch the virtual display {}: {e}", if on { "on" } else { "off" }));
+                finish(on_update, "display", error);
+            }
         }
     }
 }
@@ -173,6 +189,7 @@ fn do_display_setup(on_update: fn(Update)) {
         Ok(exit::CHECKSUM) => Some("The driver download was damaged or changed. Try again.".to_string()),
         Ok(exit::DRIVER) => Some(format!("Windows didn't install the virtual display driver. Details are in {}.", log.display())),
         Ok(exit::SERVICE) => Some(format!("The virtual display service didn't start. Details are in {}.", log.display())),
+        Ok(exit::SUNSHINE) => Some(format!("Couldn't point Sunshine at the virtual display. Details are in {}.", log.display())),
         Ok(code) => Some(format!("Setup stopped with code {code}. Details are in {}.", log.display())),
         Err(sunshine::Error::Cancelled) => Some("Cancelled. Setting up the virtual display needs administrator permission.".into()),
         Err(e) => Some(e.to_string()),

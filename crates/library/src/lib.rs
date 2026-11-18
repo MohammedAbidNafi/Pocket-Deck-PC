@@ -47,7 +47,13 @@ impl Source {
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Launch {
     /// A launcher URI (`steam://…`), started detached because the launcher process outlives it.
-    Detached { uri: String },
+    /// Sunshine can't follow the game it starts, so `folder` (the game's install folder, when
+    /// known) is what quitting from the phone closes: every process running from it.
+    Detached {
+        uri: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<PathBuf>,
+    },
     /// A command run directly, optionally from a working folder.
     Command { cmd: String, working_dir: Option<String> },
 }

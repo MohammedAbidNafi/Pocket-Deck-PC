@@ -81,11 +81,10 @@ fn main() {
     let settings = Settings::load();
     // Keep the Run entry in step with the setting (it also follows the exe if it moved).
     // Nothing is registered until setup is finished.
-    if settings.onboarding_done && settings.start_with_windows != autostart::is_enabled() {
-        if let Err(e) = autostart::set_enabled(settings.start_with_windows) {
+    if settings.onboarding_done && settings.start_with_windows != autostart::is_enabled()
+        && let Err(e) = autostart::set_enabled(settings.start_with_windows) {
             log::line(format!("start with Windows: {e}"));
         }
-    }
 
     sound::set_enabled(settings.ui_sounds);
     let worker = worker::Worker::spawn(on_update);
@@ -516,6 +515,8 @@ fn bind(w: &AppWindow) {
     engine.on_restart(|| start_task("restart", Command::Restart));
     engine.on_set_up_display(|| start_task("display", Command::DisplaySetup));
     engine.on_remove_display(|| start_task("display", Command::DisplayRemove));
+    engine.on_allow_display(|on| start_task("display", Command::DisplayAllow(on)));
+    engine.on_allow_remote(|on| start_task("display", Command::RemoteAllow(on)));
     engine.on_open_driver_page(|| open_url(sunshine::CONTROLLER_DRIVER_URL));
 }
 
@@ -570,6 +571,9 @@ fn on_update(update: Update) {
                     outdated: o.outdated(),
                     running: o.running,
                     in_use: o.in_use,
+                    allowed: o.allowed,
+                    remote_on: o.running && o.remote_enabled,
+                    remote_line: o.remote_line.into(),
                 };
             }
             Update::Pairing(u) => {
@@ -745,13 +749,11 @@ fn push_library(s: &mut Shell) {
 
     // Decode every cover once (the grid and the Home shelf share them).
     for g in &report.games {
-        if let Some(path) = &g.thumb {
-            if !thumbs.contains_key(&g.key) {
-                if let Ok(img) = slint::Image::load_from_path(path) {
+        if let Some(path) = &g.thumb
+            && !thumbs.contains_key(&g.key)
+                && let Ok(img) = slint::Image::load_from_path(path) {
                     thumbs.insert(g.key.clone(), img);
                 }
-            }
-        }
     }
 
     let games: Vec<GameItem> = report

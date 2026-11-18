@@ -31,6 +31,8 @@ pub mod exit {
     pub const DRIVER: i32 = 4;
     pub const SERVICE: i32 = 5;
     pub const OTHER: i32 = 6;
+    /// Couldn't point Sunshine at the virtual display.
+    pub const SUNSHINE: i32 = 7;
 }
 
 /// Why an elevated command failed, with the exit code that says so.
@@ -128,6 +130,12 @@ pub fn install(zip: &Path) -> Result<(), Failure> {
     vdd::ensure_mode(Mode { width: 1920, height: 1080, fps: 60 })
         .map_err(|e| fail(exit::DRIVER, format!("Couldn't write the driver's settings: {e}")))?;
 
+    // Tell Sunshine to capture the virtual display (it needs the display on to read its ID).
+    if let Err(e) = point_sunshine(&key) {
+        log::line(format!("setup: Sunshine's output: {e}"));
+        return Err(fail(exit::SUNSHINE, e));
+    }
+
     // Off until a phone asks for it.
     if !matches!(device::state(), State::Off | State::Missing) {
         if let Err(e) = device::set_enabled(false) {
@@ -141,6 +149,84 @@ pub fn install(zip: &Path) -> Result<(), Failure> {
     let _ = key.set_value("Version", &env!("CARGO_PKG_VERSION"));
     log::line("setup done");
     Ok(())
+}
+
+/// Sets Sunshine's `output_name` to the virtual display's ID and restarts Sunshine if that
+/// changed anything. Sunshine falls back to its usual screen while the display is off. The value
+/// it had before is recorded so removal can put it back.
+fn point_sunshine(key: &RegKey) -> Result<(), String> {
+    let install = pocketdeck_sunshine::detect::find().ok_or("Sunshine isn't installed.")?;
+    if device::state() != State::On {
+        device::set_enabled(true)?;
+    }
+    if device::wait_for(State::On, Duration::from_secs(10)) != State::On {
+        return Err("The virtual display didn't start, so its ID couldn't be read.".into());
+    }
+    let mut id = None;
+    for _ in 0..50 {
+        id = crate::sunshine_id::vdd();
+        if id.is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    let id = id.ok_or("Couldn't read the virtual display's ID.")?;
+
+    let file = install.config_file();
+    let text = std::fs::read_to_string(&file).unwrap_or_default();
+    let current = pocketdeck_sunshine::conf::parse(&text).get("output_name").cloned().unwrap_or_default();
+    if current == id {
+        let _ = key.set_value("SunshineOutput", &id);
+        return Ok(());
+    }
+    // Remember what the person had, once (a re-run must not record our own value as theirs).
+    let ours: Option<String> = key.get_value("SunshineOutput").ok();
+    if key.get_value::<String, _>("PreviousOutput").is_err() || ours.as_deref() != Some(current.as_str()) {
+        let _ = key.set_value("PreviousOutput", &current);
+    }
+    std::fs::write(&file, pocketdeck_sunshine::conf::with_value(&text, "output_name", Some(&id)))
+        .map_err(|e| format!("Couldn't update {}: {e}", file.display()))?;
+    let _ = key.set_value("SunshineOutput", &id);
+    log::line(format!("Sunshine now captures the virtual display ({id})"));
+    restart_sunshine();
+    Ok(())
+}
+
+/// Restarts Sunshine so it reads its settings again (only when it's running).
+fn restart_sunshine() {
+    let Ok(manager) = manager(ServiceManagerAccess::CONNECT) else { return };
+    let access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::START;
+    let Ok(service) = manager.open_service(pocketdeck_sunshine::SERVICE_NAME, access) else { return };
+    if !matches!(service.query_status(), Ok(s) if s.current_state == ServiceState::Running) {
+        return;
+    }
+    let _ = service.stop();
+    for _ in 0..60 {
+        match service.query_status() {
+            Ok(s) if s.current_state != ServiceState::Stopped => std::thread::sleep(Duration::from_millis(250)),
+            _ => break,
+        }
+    }
+    if let Err(e) = service.start(&[] as &[&str]) {
+        log::line(format!("restart Sunshine: {e}"));
+    }
+}
+
+/// Puts Sunshine's `output_name` back the way it was, if it still names our display.
+fn unpoint_sunshine(key: Option<&RegKey>) {
+    let Some(key) = key else { return };
+    let Ok(ours) = key.get_value::<String, _>("SunshineOutput") else { return };
+    let previous: String = key.get_value("PreviousOutput").unwrap_or_default();
+    let Some(install) = pocketdeck_sunshine::detect::find() else { return };
+    let file = install.config_file();
+    let Ok(text) = std::fs::read_to_string(&file) else { return };
+    if pocketdeck_sunshine::conf::parse(&text).get("output_name") != Some(&ours) {
+        return; // Changed since; leave the person's choice alone.
+    }
+    let value = (!previous.is_empty()).then_some(previous.as_str());
+    if std::fs::write(&file, pocketdeck_sunshine::conf::with_value(&text, "output_name", value)).is_ok() {
+        restart_sunshine();
+    }
 }
 
 fn copy_program() -> Result<(), String> {
@@ -249,21 +335,26 @@ fn open_firewall() {
         "netsh.exe",
         &["advfirewall", "firewall", "add", "rule", &name, "dir=in", "action=allow", &program, "protocol=TCP", "enable=yes", "profile=any"],
     );
+    // The play-from-anywhere tunnel: direct LAN and hole-punched paths arrive as UDP.
+    let _ = run(
+        "netsh.exe",
+        &["advfirewall", "firewall", "add", "rule", &name, "dir=in", "action=allow", &program, "protocol=UDP", "enable=yes", "profile=any"],
+    );
 }
 
 /// Removes everything setup did (elevated), and leaves a driver that was there before as it was.
 pub fn remove() -> Result<(), Failure> {
     log::line("remove");
     stop_service();
-    if let Ok(manager) = manager(ServiceManagerAccess::CONNECT) {
-        if let Ok(service) = manager.open_service(SERVICE_NAME, ServiceAccess::DELETE) {
+    if let Ok(manager) = manager(ServiceManagerAccess::CONNECT)
+        && let Ok(service) = manager.open_service(SERVICE_NAME, ServiceAccess::DELETE) {
             service.delete().map_err(|e| fail(exit::SERVICE, format!("Couldn't remove the service: {e}")))?;
         }
-    }
     let _ = run("netsh.exe", &["advfirewall", "firewall", "delete", "rule", &format!("name={FIREWALL_RULE}")]);
 
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let key = hklm.open_subkey_with_flags(REG_KEY, KEY_READ).ok();
+    unpoint_sunshine(key.as_ref());
     let get = |name: &str| key.as_ref().and_then(|k| k.get_value::<u32, _>(name).ok());
     match get("OwnDevice") {
         Some(1) => {
@@ -276,11 +367,10 @@ pub fn remove() -> Result<(), Failure> {
         }
         _ => {}
     }
-    if get("OwnSettings") == Some(1) {
-        if let Ok(k) = hklm.open_subkey_with_flags(vdd::DRIVER_REG_KEY, KEY_ALL_ACCESS) {
+    if get("OwnSettings") == Some(1)
+        && let Ok(k) = hklm.open_subkey_with_flags(vdd::DRIVER_REG_KEY, KEY_ALL_ACCESS) {
             let _ = k.delete_value("VDDPATH");
         }
-    }
     let _ = hklm.delete_subkey_all(REG_KEY);
     let _ = std::fs::remove_dir_all(install_dir());
     log::line("removed");

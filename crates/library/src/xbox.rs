@@ -158,7 +158,7 @@ fn read_package(full_name: &str, root: &Path, registry_name: Option<&str>) -> Op
         key: format!("xbox:{family}"),
         source: Source::Xbox,
         name: clean_name(&name),
-        launch: Launch::Detached { uri: format!(r"explorer.exe shell:AppsFolder\{family}!{app_id}") },
+        launch: Launch::Detached { uri: format!(r"explorer.exe shell:AppsFolder\{family}!{app_id}"), folder: None },
         art,
         art_url: None,
     })

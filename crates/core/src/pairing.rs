@@ -172,12 +172,11 @@ fn adapter_addresses() -> Vec<Ipv4Addr> {
             if a.OperStatus == IfOperStatusUp && a.IfType != IF_TYPE_SOFTWARE_LOOPBACK && !a.FirstGatewayAddress.is_null() {
                 let mut unicast = a.FirstUnicastAddress;
                 while let Some(u) = unicast.as_ref() {
-                    if let Some(sa) = u.Address.lpSockaddr.as_ref() {
-                        if sa.sa_family == AF_INET {
+                    if let Some(sa) = u.Address.lpSockaddr.as_ref()
+                        && sa.sa_family == AF_INET {
                             let sin = &*(u.Address.lpSockaddr as *const SOCKADDR_IN);
                             out.push(Ipv4Addr::from(u32::from_be(sin.sin_addr.S_un.S_addr)));
                         }
-                    }
                     unicast = u.Next;
                 }
             }

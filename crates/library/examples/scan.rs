@@ -15,9 +15,8 @@ fn main() {
         let mut n = 0;
         for (_, scan) in pocketdeck_library::scan_all() {
             for g in scan.games {
-                if let Some(art) = &g.art {
-                    if pocketdeck_library::covers::prepare(std::path::Path::new(&out), &g.key, art).is_some() { n += 1; }
-                }
+                if let Some(art) = &g.art
+                    && pocketdeck_library::covers::prepare(std::path::Path::new(&out), &g.key, art).is_some() { n += 1; }
             }
         }
         println!("wrote {n} covers in {:?}", t.elapsed());

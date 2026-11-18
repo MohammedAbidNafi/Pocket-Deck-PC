@@ -28,10 +28,15 @@ Third-party components
   roxmltree                                           MIT / Apache-2.0   Yevhenii Reizner and contributors
   winresource                                         MIT                Max Resch
   raw-window-handle                                   MIT / Apache-2.0 / Zlib   Osspial and contributors
+  iroh, iroh-relay protocol, iroh-mdns-address-lookup MIT / Apache-2.0   n0, inc. and contributors
+      https://github.com/n0-computer/iroh (play from anywhere)
+  tokio, bytes                                        MIT                Tokio contributors
+  sha1                                                MIT / Apache-2.0   RustCrypto developers
   resvg, ico (build tools only, not shipped)          Apache-2.0 / MIT, MIT   their contributors
 
 The full list of Rust crates is in Cargo.lock (`cargo metadata` shows each licence). All are
-GPLv3-compatible: MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0, Unicode-3.0 and similar.
+GPLv3-compatible: MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0, Unicode-3.0, CDLA-Permissive-2.0
+(root certificate data) and similar.
 
 Not included:
 

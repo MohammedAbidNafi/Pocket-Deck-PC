@@ -233,12 +233,11 @@ fn session(rx: &Receiver<PairCommand>, post: &dyn Fn(PairUpdate)) -> Option<Pair
         }
 
         if let Some(at) = entered {
-            if let Ok(now) = api.clients() {
-                if let Some(c) = pairing::new_client(&now, &clients_before) {
+            if let Ok(now) = api.clients()
+                && let Some(c) = pairing::new_client(&now, &clients_before) {
                     post(PairUpdate::Paired { name: c.name.clone() });
                     return None;
                 }
-            }
             if at.elapsed() > Duration::from_secs(20) {
                 return fail("Your phone didn't finish pairing. Show a new code and scan it again.".into());
             }
