@@ -51,9 +51,15 @@ jobs:
           # Built into the program for cover art (crates/library/build.rs). Without it, the
           # release still works but games with no launcher art get no cover.
           STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
+          # Built in as the play-from-anywhere relay (crates/display/src/tunnel.rs), e.g.
+          # https://relay.example.com. Without it, the tunnel works on the local network only.
+          POCKETDECK_RELAY_URL: ${{ vars.POCKETDECK_RELAY_URL }}
         run: |
           if [ -z "$STEAMGRIDDB_API_KEY" ]; then
             echo "::warning::STEAMGRIDDB_API_KEY secret is not set; this release won't fetch covers from SteamGridDB."
+          fi
+          if [ -z "$POCKETDECK_RELAY_URL" ]; then
+            echo "::warning::POCKETDECK_RELAY_URL variable is not set; play from anywhere will only work on the local network."
           fi
           cargo test --workspace --locked
           cargo build --release --locked -p pocketdeck-pc

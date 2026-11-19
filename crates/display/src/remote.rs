@@ -27,6 +27,9 @@ pub const PATH_STATUS: &str = "/pocketdeck/v1/display";
 pub const PATH_PREPARE: &str = "/pocketdeck/v1/display/prepare";
 pub const PATH_KEEPALIVE: &str = "/pocketdeck/v1/display/keepalive";
 pub const PATH_RELEASE: &str = "/pocketdeck/v1/display/release";
+/// Registers the phone for play from anywhere: `{"id": "<phone endpoint id>"}` in,
+/// `{"id": "<PC endpoint id>", "relay": "<relay URL or null>"}` out. See `docs/remote-play.md`.
+pub const PATH_REMOTE: &str = "/pocketdeck/v1/remote";
 
 const MAX_HEAD: usize = 8 * 1024;
 const MAX_BODY: usize = 4 * 1024;
@@ -203,7 +206,8 @@ fn handle<B: Backend>(stream: TcpStream, controller: &Controller<B>, s: &Sunshin
     let conn = ServerConnection::new(config).map_err(|e| e.to_string())?;
     let mut tls = StreamOwned::new(conn, stream);
     let request = read_request(&mut tls).map_err(|e| format!("{peer}: {e}"))?;
-    let (status, body) = route(&request, controller);
+    let client_cert = tls.conn.peer_certificates().and_then(|c| c.first()).map(|c| c.as_ref().to_vec());
+    let (status, body) = route(&request, controller, client_cert.as_deref());
     log::line(format!("remote: {peer} {} {} -> {status}", request.method, request.path));
     write_response(&mut tls, status, &body).map_err(|e| e.to_string())?;
     tls.conn.send_close_notify();
@@ -242,11 +246,10 @@ pub fn read_request(r: &mut impl Read) -> Result<Request, String> {
     let path = target.split('?').next().unwrap_or(target).to_string();
     let mut length = 0usize;
     for line in lines {
-        if let Some((name, value)) = line.split_once(':') {
-            if name.trim().eq_ignore_ascii_case("content-length") {
+        if let Some((name, value)) = line.split_once(':')
+            && name.trim().eq_ignore_ascii_case("content-length") {
                 length = value.trim().parse().map_err(|_| "bad Content-Length")?;
             }
-        }
     }
     if length > MAX_BODY {
         return Err("request body too long".into());
@@ -263,8 +266,9 @@ pub fn parse_mode(body: &[u8]) -> Option<Mode> {
     Some(Mode { width: n("width")?, height: n("height")?, fps: n("fps")? })
 }
 
-fn route<B: Backend>(req: &Request, controller: &Controller<B>) -> (u16, Value) {
+fn route<B: Backend>(req: &Request, controller: &Controller<B>, client_cert: Option<&[u8]>) -> (u16, Value) {
     let reply = match (req.method.as_str(), req.path.as_str()) {
+        ("POST", PATH_REMOTE) => return register(&req.body, client_cert),
         ("GET", PATH_STATUS) => controller.status(),
         ("POST", PATH_PREPARE) => match parse_mode(&req.body) {
             Some(mode) => controller.prepare(mode),
@@ -275,6 +279,26 @@ fn route<B: Backend>(req: &Request, controller: &Controller<B>) -> (u16, Value) 
         _ => return (404, json!({ "state": "failed", "message": "Not found." })),
     };
     (reply.http_status(), reply.to_json())
+}
+
+/// `POST /pocketdeck/v1/remote`. Only reachable with a paired client certificate (the TLS
+/// handshake already checked it), which is what the phone's endpoint id gets tied to.
+fn register(body: &[u8], client_cert: Option<&[u8]>) -> (u16, Value) {
+    let failed = |status: u16, m: &str| (status, json!({ "state": "failed", "message": m }));
+    let Some(cert) = client_cert else { return failed(400, "No client certificate.") };
+    let id = serde_json::from_slice::<Value>(body).ok().and_then(|v| v.get("id")?.as_str().map(str::to_string));
+    let Some(Ok(phone)) = id.map(|id| pocketdeck_remote::parse_id(&id)) else {
+        return failed(400, "Send {\"id\": \"<endpoint id>\"}.");
+    };
+    let pc = match crate::tunnel::pc_id() {
+        Ok(id) => id,
+        Err(e) => return failed(500, &e),
+    };
+    if let Err(e) = crate::tunnel::register(phone, cert) {
+        return failed(500, &e);
+    }
+    log::line(format!("tunnel: registered phone {phone}"));
+    (200, json!({ "id": pc.to_string(), "relay": crate::tunnel::relay_url() }))
 }
 
 fn write_response(w: &mut impl Write, status: u16, body: &Value) -> std::io::Result<()> {

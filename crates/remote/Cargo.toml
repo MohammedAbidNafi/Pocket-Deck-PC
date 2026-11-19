@@ -1,0 +1,16 @@
+[package]
+name = "pocketdeck-remote"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+iroh = { version = "=1.4.1", default-features = false, features = ["portmapper", "tls-ring"] }
+iroh-mdns-address-lookup = "0.6.1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "io-util", "time", "macros"] }
+bytes = "1"
+
+[dev-dependencies]
+iroh = { version = "=1.4.1", default-features = false, features = ["portmapper", "tls-ring", "test-utils"] }
+iroh-relay = { version = "=1.4.1", default-features = false, features = ["server", "test-utils"] }

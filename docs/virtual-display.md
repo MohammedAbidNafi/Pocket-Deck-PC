@@ -19,6 +19,7 @@ and switches it on, at the phone's mode, just before the stream starts.
 | Driver: [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver) 25.7.23, MIT, SignPath-signed. Pinned by SHA-256 in `vdd.rs`, installed unchanged. | Windows driver store, device `Root\MttVDD` | — |
 | Service `PocketDeckDisplay` (`PocketDeckDisplay.exe --display service`): owns the device, hands out leases, serves the phone. | `%ProgramFiles%\PocketDeck\PocketDeckDisplay.exe` (a copy of `PocketDeck.exe`) | LocalSystem |
 | Layout helper (`--display arrange …` / `--display restore`): makes the virtual display the main screen, with the PC's own screens beside it. | started by the service in the signed-in session | SYSTEM, console session |
+| Window helper (`--display follow <device>`): for as long as the virtual display is on, moves windows of programs started during the stream onto it (each for its first 20 s), for games that remember another monitor. Ends by itself when the display goes off. | started by the service after each arrange, one at a time | SYSTEM, console session |
 | Setup / removal (`--display setup <zip>` / `--display remove`) | Settings → Streaming host → "Match your phone's screen" | elevated, one UAC prompt |
 
 Setup records what it did under `HKLM\SOFTWARE\PocketDeck\Display` (`OwnDevice`, `WasEnabled`, `OwnSettings`,

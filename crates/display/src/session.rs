@@ -29,8 +29,43 @@ impl Drop for Handle {
     }
 }
 
+/// Starts `exe args` in the console session and leaves it running.
+pub fn spawn_in_console(exe: &Path, args: &[String]) -> Result<(), String> {
+    match start_in_console(exe, args)? {
+        Started::Here(_) => Ok(()),
+        Started::There(_process) => Ok(()),
+    }
+}
+
 /// Runs `exe args` in the console session and returns its exit code.
 pub fn run_in_console(exe: &Path, args: &[String], limit: Duration) -> Result<u32, String> {
+    let process = match start_in_console(exe, args)? {
+        Started::Here(mut child) => return Ok(child.wait().map_err(|e| e.to_string())?.code().unwrap_or(1) as u32),
+        Started::There(process) => process,
+    };
+    // SAFETY: an open process handle we own.
+    unsafe {
+        match WaitForSingleObject(process.0, limit.as_millis().min(u32::MAX as u128) as u32) {
+            WAIT_OBJECT_0 => {}
+            WAIT_TIMEOUT => {
+                TerminateProcess(process.0, 1);
+                return Err("The display helper took too long.".into());
+            }
+            _ => return Err(os_error("wait for the display helper")),
+        }
+        let mut code = 1u32;
+        GetExitCodeProcess(process.0, &mut code);
+        Ok(code)
+    }
+}
+
+enum Started {
+    /// Already in the console session (testing from a terminal): an ordinary child.
+    Here(std::process::Child),
+    There(Handle),
+}
+
+fn start_in_console(exe: &Path, args: &[String]) -> Result<Started, String> {
     // SAFETY: plain calls with out-pointers to locals.
     let (console, ours) = unsafe {
         let console = WTSGetActiveConsoleSessionId();
@@ -42,8 +77,7 @@ pub fn run_in_console(exe: &Path, args: &[String], limit: Duration) -> Result<u3
         return Err("Nobody is signed in to Windows.".into());
     }
     if console == ours {
-        let status = std::process::Command::new(exe).args(args).status().map_err(|e| e.to_string())?;
-        return Ok(status.code().unwrap_or(1) as u32);
+        return std::process::Command::new(exe).args(args).spawn().map(Started::Here).map_err(|e| e.to_string());
     }
 
     let mut command_line = wide(&command_line(exe, args));
@@ -83,19 +117,8 @@ pub fn run_in_console(exe: &Path, args: &[String], limit: Duration) -> Result<u3
         {
             return Err(os_error("start the display helper"));
         }
-        let process = Handle(info.hProcess);
         let _thread = Handle(info.hThread);
-        match WaitForSingleObject(process.0, limit.as_millis().min(u32::MAX as u128) as u32) {
-            WAIT_OBJECT_0 => {}
-            WAIT_TIMEOUT => {
-                TerminateProcess(process.0, 1);
-                return Err("The display helper took too long.".into());
-            }
-            _ => return Err(os_error("wait for the display helper")),
-        }
-        let mut code = 1u32;
-        GetExitCodeProcess(process.0, &mut code);
-        Ok(code)
+        Ok(Started::There(Handle(info.hProcess)))
     }
 }
 

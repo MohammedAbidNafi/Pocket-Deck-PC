@@ -74,7 +74,7 @@ mod tests {
     use pocketdeck_library::Launch;
 
     fn game(key: &str, source: Source) -> Game {
-        Game { key: key.into(), source, name: key.into(), launch: Launch::Detached { uri: "x".into() }, art: None, art_url: None }
+        Game { key: key.into(), source, name: key.into(), launch: Launch::Detached { uri: "x".into(), folder: None }, art: None, art_url: None }
     }
 
     #[test]

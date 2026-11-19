@@ -6,7 +6,7 @@ PC repo: `Pocket-Deck-PC` (Rust/Slint). Phone repo: `Android-Game-Launcher` (Kot
 ## Goal
 
 Replace "phone shows a PIN, you type it into Sunshine's web page" with "PC shows a QR code, phone scans it, done".
-Stock Sunshine, no fork, no new ports. LAN only for v1; the remote (iroh) field is reserved for play-from-anywhere.
+Stock Sunshine, no fork, no new ports. Pairing stays LAN only. Play from anywhere doesn't use the QR code: the phone registers over the LAN right after pairing (see `remote-play.md`).
 
 ## How it works
 
@@ -43,7 +43,7 @@ pocketdeck://pair?v=1&n=<pc name>&a=<addr>[,<addr>...]&p=<http port>&pin=<4 digi
 | `p`   | Sunshine's base HTTP port (default `47989`). HTTPS is derived the usual way (`p - 5`). |
 | `pin` | 4 digits, new random value every time the QR is shown. |
 | `fp`  | SHA-256 of Sunshine's server certificate (DER), lowercase hex, no separators. |
-| `r`   | *Reserved, not in v1:* iroh node id for remote play. The phone must ignore unknown keys. |
+| `r`   | *Reserved, unused.* Play from anywhere registers through `POST /pocketdeck/v1/remote` instead (`remote-play.md`). The phone must ignore unknown keys. |
 
 Rules:
 - The PC enforces expiry (it stops entering the PIN after 2 minutes or after one success). The phone does not check time.

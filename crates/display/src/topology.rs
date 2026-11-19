@@ -166,6 +166,12 @@ pub fn arrange(instance_id: &str, mode: Mode, limit: Duration) -> Result<String,
     Ok(name)
 }
 
+/// The virtual display's GDI name (`\.\DISPLAY5`) while it's part of the desktop, else `None`.
+pub fn active_gdi_name(instance_id: &str) -> Option<String> {
+    let p = vdd_path(instance_id, QDC_ONLY_ACTIVE_PATHS).ok()??;
+    Some(source_gdi_name(p.sourceInfo.adapterId, p.sourceInfo.id))
+}
+
 /// True when a screen other than the virtual display is connected (active or not).
 fn other_screens_connected(instance_id: &str) -> Result<bool, String> {
     let (paths, _) = query(QDC_ALL_PATHS)?;

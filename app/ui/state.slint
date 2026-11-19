@@ -42,6 +42,11 @@ export struct DisplayStatus {
     running: bool,
     // A phone is streaming on it right now.
     in-use: bool,
+    // Switched on in Settings: phones may use it.
+    allowed: bool,
+    // Play from anywhere is switched on, and how it's doing.
+    remote-on: bool,
+    remote-line: string,
 }
 
 export global Engine {
@@ -51,6 +56,10 @@ export global Engine {
     in-out property <DisplayStatus> display;
     callback set-up-display();
     callback remove-display();
+    // Switch the feature on or off once it's set up (no administrator prompt).
+    callback allow-display(bool);
+    // Play from anywhere on or off (no administrator prompt: the service does it).
+    callback allow-remote(bool);
     in property <string> pinned-version;
     // The person installed Sunshine themselves, so they know it by name. When PocketDeck set it
     // up (or nothing is installed yet) it's just "the streaming engine".

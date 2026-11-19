@@ -1,4 +1,5 @@
-# Slint 1.16 is the newest release that builds on Rust 1.88; CI and local builds use the same toolchain.
+# iroh 1.4 (play from anywhere) needs Rust 1.91+. Slint 1.16 builds fine on newer toolchains;
+# CI and local builds use the same toolchain.
 [toolchain]
-channel = "1.88.0"
+channel = "1.98.0"
 components = ["clippy", "rustfmt"]

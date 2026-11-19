@@ -66,6 +66,9 @@ pub trait Backend: Send + Sync {
     fn arrange(&self, mode: Mode) -> Result<(), String>;
     /// Puts the remembered layout back, in the signed-in session.
     fn restore(&self) -> Result<(), String>;
+    /// Whether the person has the feature switched on (Settings in PocketDeck).
+    fn allowed(&self) -> bool;
+    fn set_allowed(&self, on: bool) -> Result<(), String>;
 }
 
 #[derive(Default)]
@@ -105,6 +108,9 @@ impl<B: Backend> Controller<B> {
         if state == State::Missing {
             return Reply::Unavailable("The virtual display isn't set up on this PC.".into());
         }
+        if !self.backend.allowed() {
+            return Reply::Unavailable("The virtual display is switched off in PocketDeck's settings on the PC.".into());
+        }
         let added = match self.backend.ensure_mode(mode) {
             Ok(a) => a,
             Err(e) => return Reply::Failed(format!("Couldn't add {mode} to the virtual display: {e}")),
@@ -118,11 +124,10 @@ impl<B: Backend> Controller<B> {
             }
             self.backend.wait_for(State::Off, Duration::from_secs(5));
         }
-        if state == State::Off || restart {
-            if let Err(e) = self.backend.set_enabled(true) {
+        if (state == State::Off || restart)
+            && let Err(e) = self.backend.set_enabled(true) {
                 return Reply::Failed(e);
             }
-        }
         match self.backend.wait_for(State::On, Duration::from_secs(10)) {
             State::On => {}
             other => {
@@ -207,18 +212,30 @@ impl<B: Backend> Controller<B> {
         log::line(format!("off ({why})"));
     }
 
-    /// One line from the local pipe: `status`, `on <width> <height> <fps>`, `keepalive`, `off`.
+    /// Switches the feature on or off. Off also hands back a display that's on right now.
+    pub fn allow(&self, on: bool) -> Reply {
+        if let Err(e) = self.backend.set_allowed(on) {
+            return Reply::Failed(e);
+        }
+        log::line(if on { "feature switched on" } else { "feature switched off" });
+        if on { self.status() } else { self.release() }
+    }
+
+    /// One line from the local pipe: `status`, `on <width> <height> <fps>`, `keepalive`, `off`,
+    /// `allow`, `disallow`.
     pub fn command(&self, line: &str) -> Reply {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words.as_slice() {
             ["status"] => self.status(),
             ["keepalive"] => self.keepalive(),
             ["off"] => self.release(),
+            ["allow"] => self.allow(true),
+            ["disallow"] => self.allow(false),
             ["on", w, h, f] => match (w.parse(), h.parse(), f.parse()) {
                 (Ok(width), Ok(height), Ok(fps)) => self.prepare(Mode { width, height, fps }),
                 _ => Reply::Failed("Usage: on <width> <height> <fps>".into()),
             },
-            _ => Reply::Failed("Commands: status, on <width> <height> <fps>, keepalive, off".into()),
+            _ => Reply::Failed("Commands: status, on <width> <height> <fps>, keepalive, off, allow, disallow".into()),
         }
     }
 }
@@ -270,15 +287,33 @@ impl Backend for SystemBackend {
         let device = crate::device::find().ok_or("the virtual display disappeared")?;
         self.helper(&[
             "arrange".into(),
-            device.instance_id,
+            device.instance_id.clone(),
             mode.width.to_string(),
             mode.height.to_string(),
             mode.fps.to_string(),
-        ])
+        ])?;
+        // Games that remember another monitor get moved onto the virtual display. The helper
+        // ends by itself when the display is switched off, and only one runs at a time.
+        let args = [crate::FLAG.to_string(), "follow".into(), device.instance_id];
+        if let Err(e) = crate::session::spawn_in_console(&self.exe, &args) {
+            log::line(format!("follow: {e}"));
+        }
+        Ok(())
     }
 
     fn restore(&self) -> Result<(), String> {
         self.helper(&["restore".into()])
+    }
+
+    fn allowed(&self) -> bool {
+        crate::allowed()
+    }
+
+    fn set_allowed(&self, on: bool) -> Result<(), String> {
+        winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE)
+            .create_subkey(crate::REG_KEY)
+            .and_then(|(k, _)| k.set_value("Enabled", &u32::from(on)))
+            .map_err(|e| format!("Couldn't save the setting: {e}"))
     }
 }
 
@@ -327,11 +362,25 @@ fn run_service() -> windows_service::Result<()> {
 
     let controller = Arc::new(Controller::new(SystemBackend::new()));
     controller.reset();
+    let tunnel = crate::tunnel::Tunnel::new();
+    {
+        let t = tunnel.clone();
+        std::thread::Builder::new().name("tunnel".into()).spawn(move || t.restart()).ok();
+    }
     {
         let c = controller.clone();
+        let t = tunnel.clone();
         std::thread::Builder::new()
             .name("pipe".into())
-            .spawn(move || crate::pipe::serve(move |line| c.command(line).to_json().to_string()))
+            .spawn(move || {
+                crate::pipe::serve(move |line| {
+                    let words: Vec<&str> = line.split_whitespace().collect();
+                    match words.split_first() {
+                        Some((&"remote", rest)) => t.command(rest).to_string(),
+                        _ => c.command(line).to_json().to_string(),
+                    }
+                })
+            })
             .ok();
     }
     {
@@ -342,9 +391,11 @@ fn run_service() -> windows_service::Result<()> {
     // Ticks every 5 s until told to stop (or the handler went away).
     while let Err(std::sync::mpsc::RecvTimeoutError::Timeout) = stop_rx.recv_timeout(Duration::from_secs(5)) {
         controller.tick();
+        tunnel.tick();
     }
     handle.set_service_status(status(ServiceState::StopPending, ServiceControlAccept::empty()))?;
     controller.release();
+    tunnel.stop();
     log::line("service stopped");
     handle.set_service_status(status(ServiceState::Stopped, ServiceControlAccept::empty()))?;
     Ok(())
@@ -361,11 +412,19 @@ mod tests {
         log: Mutex<Vec<String>>,
         arrange_fails: bool,
         never_starts: bool,
+        allowed: Mutex<bool>,
     }
 
     impl Fake {
         fn new(state: State) -> Self {
-            Fake { state: Mutex::new(state), modes: Mutex::new(vec![]), log: Mutex::new(vec![]), arrange_fails: false, never_starts: false }
+            Fake {
+                state: Mutex::new(state),
+                modes: Mutex::new(vec![]),
+                log: Mutex::new(vec![]),
+                arrange_fails: false,
+                never_starts: false,
+                allowed: Mutex::new(true),
+            }
         }
         fn did(&self) -> Vec<String> {
             self.log.lock().unwrap().clone()
@@ -404,6 +463,25 @@ mod tests {
             self.note("restore");
             Ok(())
         }
+        fn allowed(&self) -> bool {
+            *self.allowed.lock().unwrap()
+        }
+        fn set_allowed(&self, on: bool) -> Result<(), String> {
+            *self.allowed.lock().unwrap() = on;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn switching_the_feature_off_refuses_phones_and_hands_the_display_back() {
+        let c = Controller::new(Fake::new(State::Off));
+        c.prepare(PHONE);
+        assert_eq!(c.command("disallow"), Reply::Off);
+        assert_eq!(c.backend.state(), State::Off);
+        assert!(matches!(c.prepare(PHONE), Reply::Unavailable(_)));
+        assert_eq!(c.backend.state(), State::Off);
+        assert_eq!(c.command("allow"), Reply::Off);
+        assert!(matches!(c.prepare(PHONE), Reply::Ready { .. }));
     }
 
     const PHONE: Mode = Mode { width: 2400, height: 1080, fps: 120 };

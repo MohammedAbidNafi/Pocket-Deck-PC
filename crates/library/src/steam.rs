@@ -46,7 +46,10 @@ pub fn scan() -> Scan {
                 key: m.key(),
                 source: Source::Steam,
                 name: clean_name(&m.name),
-                launch: Launch::Detached { uri: format!("steam://rungameid/{}", m.app_id) },
+                launch: Launch::Detached {
+                    uri: format!("steam://rungameid/{}", m.app_id),
+                    folder: Some(apps.join("common").join(&m.install_dir)),
+                },
                 art: box_art(&root, m.app_id),
                 art_url: None,
             });

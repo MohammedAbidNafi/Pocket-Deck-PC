@@ -303,6 +303,7 @@ component HomePage inherits Page {
                         BodyText {
                             text: !Engine.status.checked ? "Checking this PC…"
                                 : Engine.status.busy ? "A stream is running right now."
+                                : root.ready && Engine.display.remote-on ? "Ready to stream. Open PocketDeck on your phone, at home or away, and pick a game."
                                 : root.ready ? "Ready to stream. Open PocketDeck on your phone, connected to the same network, and pick a game."
                                 : "Something needs fixing before your phone can stream. Start with the first item marked below.";
                         }
@@ -387,11 +388,11 @@ component HomePage inherits Page {
                     EngineGrid { }
                 }
 
-                // What's on its way.
+                // What's new.
                 VerticalLayout {
                     spacing: 14px;
                     SectionTitle {
-                        text: "Coming next";
+                        text: "What's new";
                     }
                     HorizontalLayout {
                         spacing: 18px;
@@ -401,8 +402,14 @@ component HomePage inherits Page {
                             horizontal-stretch: 1;
                             ComingCard {
                                 icon: Icons.globe;
+                                badge: "NEW";
                                 title: "Play from anywhere";
-                                body: "Stream to your phone on mobile data or any Wi-Fi, without Tailscale or router setup. Your phone connects straight to this PC.";
+                                // Live once it's set up; what it does until then.
+                                body: Engine.display.remote-on && Engine.display.remote-line != "" ? Engine.display.remote-line
+                                    : "Stream to your phone on mobile data or any Wi-Fi, without Tailscale or router setup. The stream goes straight from this PC to your phone.";
+                                clicked => {
+                                    App.tab = 3;
+                                }
                             }
                         }
                         RiseIn {
@@ -444,26 +451,53 @@ component DisplayRow inherits SettingRow {
     property <DisplayStatus> d: Engine.display;
 
     title: "Match your phone's screen";
-    subtitle: root.busy ? Engine.task.label
+    subtitle: root.busy && Engine.task.label != "" ? Engine.task.label
         : root.failed ? Engine.task.error
         : !d.installed ? "Adds a virtual display at your phone's resolution, switched on only while you stream. Asks for administrator permission."
         : d.outdated ? "Set up by another version of PocketDeck. Update it to keep it working. Asks for administrator permission."
         : !d.running ? "The virtual display service isn't running. Update it to repair it."
+        : !d.allowed ? "Off. Your phone streams this PC's own screen."
         : d.in-use ? "In use. Your phone is streaming on the virtual display."
         : "Games run at your phone's resolution on a screen of their own. This PC's screens stay on while you stream.";
     value: root.busy ? "" : d.installed && (d.outdated || !d.running) ? "Update" : "";
     icon: Icons.phone;
     has-toggle: true;
-    toggle-on: d.installed;
+    // Once set up, the switch turns the feature on and off; removing it is the row below.
+    toggle-on: d.installed && d.allowed;
     enabled: d.checked && !Engine.task.active;
     clicked => {
-        if (d.installed && (d.outdated || !d.running)) {
+        if (!d.installed || d.outdated || !d.running) {
             Engine.set-up-display();
-        } else if (d.installed) {
-            Engine.remove-display();
         } else {
-            Engine.set-up-display();
+            Engine.allow-display(!d.allowed);
         }
+    }
+}
+
+// "Play from anywhere": the phone reaches this PC through the tunnel, at home and away.
+component RemoteRow inherits SettingRow {
+    property <DisplayStatus> d: Engine.display;
+
+    title: "Play from anywhere";
+    subtitle: d.remote-line != "" ? d.remote-line
+        : d.remote-on ? "Stream on mobile data or any Wi-Fi. The stream always goes straight to your phone."
+        : "Off. Phones connect on this PC's network only.";
+    icon: Icons.plug;
+    has-toggle: true;
+    toggle-on: d.remote-on;
+    enabled: d.checked && !Engine.task.active;
+    clicked => {
+        Engine.allow-remote(!d.remote-on);
+    }
+}
+
+component RemoveDisplayRow inherits SettingRow {
+    title: "Remove the virtual display";
+    subtitle: "Uninstalls its driver and service and puts Sunshine's screen setting back. Asks for administrator permission.";
+    icon: Icons.wrench;
+    enabled: Engine.display.checked && !Engine.task.active;
+    clicked => {
+        Engine.remove-display();
     }
 }
 
@@ -567,6 +601,8 @@ component SettingsPage inherits Page {
                     }
                 }
                 DisplayRow { }
+                if Engine.display.installed && Engine.display.running: RemoteRow { }
+                if Engine.display.installed: RemoveDisplayRow { }
                 SettingRow {
                     title: "Restart \{Engine.name-lower}";
                     subtitle: "Asks for administrator permission.";

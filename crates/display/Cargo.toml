@@ -6,9 +6,11 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+pocketdeck-remote = { path = "../remote" }
 pocketdeck-sunshine = { path = "../sunshine" }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde_json = "1.0.154"
+sha1 = "0.11.0"
 sha2 = "0.11.1"
 windows-service = "0.8.1"
 winreg = "0.56.0"
@@ -23,6 +25,8 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Console",
     "Win32_System_IO",
     "Win32_System_Pipes",
+    "Win32_System_Registry",
     "Win32_System_RemoteDesktop",
     "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
 ] }

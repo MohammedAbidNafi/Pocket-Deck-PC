@@ -28,9 +28,15 @@ impl Wanted {
 }
 
 pub fn app_json(game: &Game, cover: Option<&Path>) -> Value {
-    let (cmd, working_dir, detached) = match &game.launch {
-        Launch::Detached { uri } => (String::new(), String::new(), vec![uri.clone()]),
-        Launch::Command { cmd, working_dir } => (cmd.clone(), working_dir.clone().unwrap_or_default(), vec![]),
+    let (cmd, working_dir, detached, prep) = match &game.launch {
+        Launch::Detached { uri, folder } => {
+            let prep = match folder {
+                Some(f) => vec![json!({"do": "", "undo": close_folder_command(f), "elevated": false})],
+                None => vec![],
+            };
+            (String::new(), String::new(), vec![uri.clone()], prep)
+        }
+        Launch::Command { cmd, working_dir } => (cmd.clone(), working_dir.clone().unwrap_or_default(), vec![], vec![]),
     };
     json!({
         "name": game.name,
@@ -39,13 +45,29 @@ pub fn app_json(game: &Game, cover: Option<&Path>) -> Value {
         "working-dir": working_dir,
         "image-path": cover.map(|p| p.display().to_string()).unwrap_or_default(),
         "detached": detached,
-        "prep-cmd": [],
+        "prep-cmd": prep,
         "exclude-global-prep-cmd": false,
         "elevated": false,
         "auto-detach": true,
         "wait-all": true,
         "exit-timeout": 5,
     })
+}
+
+/// Sunshine's "undo" step for a detached game: asks every process running from the game's
+/// folder to close, then force-closes what's still there 5 s later. Sunshine runs it when the
+/// phone quits the game (it can't follow a game a launcher started).
+pub fn close_folder_command(folder: &Path) -> String {
+    // Inside a PowerShell single-quoted string, a quote is written twice.
+    let dir = folder.display().to_string();
+    let dir = dir.trim_end_matches('\\').replace('\'', "''");
+    format!(
+        "powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command \"\
+         $p = Get-Process | Where-Object {{ $_.Path -like '{dir}\\*' }}; \
+         $p | ForEach-Object {{ [void]$_.CloseMainWindow() }}; \
+         if ($p) {{ Start-Sleep -Seconds 5 }}; \
+         $p | Where-Object {{ -not $_.HasExited }} | Stop-Process -Force\""
+    )
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -60,9 +82,11 @@ pub enum Op {
 /// The fields that matter for deciding whether an app needs rewriting.
 fn same(app: &Value, wanted: &Value) -> bool {
     let detached = |v: &Value| v.get("detached").cloned().unwrap_or(json!([]));
+    let prep = |v: &Value| v.get("prep-cmd").cloned().unwrap_or(json!([]));
     let text = |v: &Value, k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
     ["name", "cmd", "working-dir", "image-path"].iter().all(|k| text(app, k) == text(wanted, k))
         && detached(app) == detached(wanted)
+        && prep(app) == prep(wanted)
 }
 
 /// Works out the changes. Returns the operations and the keys of games skipped because the
@@ -154,7 +178,7 @@ mod tests {
             key: key.into(),
             source: Source::Steam,
             name: name.into(),
-            launch: Launch::Detached { uri: format!("steam://rungameid/{key}") },
+            launch: Launch::Detached { uri: format!("steam://rungameid/{key}"), folder: None },
             art: None,
             art_url: None,
         }
@@ -224,6 +248,16 @@ mod tests {
             launch: Launch::Command { cmd: "com.epicgames.launcher://apps/a%3Ab%3Ac?action=launch&silent=true".into(), working_dir: None },
             ..game("epic:c", "The Operator")
         };
+        assert_eq!(a["prep-cmd"], json!([]));
+        let dst = Game {
+            launch: Launch::Detached {
+                uri: "steam://rungameid/322330".into(),
+                folder: Some(r"D:\Steam\steamapps\common\Don't Starve Together".into()),
+            },
+            ..game("steam:322330", "Don't Starve Together")
+        };
+        let undo = app_json(&dst, None)["prep-cmd"][0]["undo"].as_str().unwrap().to_string();
+        assert!(undo.contains(r"-like 'D:\Steam\steamapps\common\Don''t Starve Together\*'"), "{undo}");
         let e = app_json(&epic, None);
         assert_eq!(e["detached"], json!([]));
         assert_eq!(e["image-path"], "");
