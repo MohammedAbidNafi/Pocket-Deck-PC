@@ -5,10 +5,10 @@
 <h1 align="center">PocketDeck for PC</h1>
 
 <p align="center">
-  Your PC games, on your phone. The Windows companion to <a href="https://github.com/MohammedAbidNafi/Pocket-Deck">PocketDeck</a>.
+  Your PC games, on your phone. The Windows companion to <a href="https://github.com/Pocket-Deck-App/Pocket-Deck-Android">PocketDeck</a>.
 </p>
 
-PocketDeck for PC gets a Windows gaming PC ready to stream to [PocketDeck](https://github.com/MohammedAbidNafi/Pocket-Deck) on your phone. It sets up the streaming engine ([Sunshine](https://github.com/SunshineStream/Sunshine)), finds the games you have installed and puts them on your phone with their covers, and pairs your phone with one scan. Then it waits quietly in the tray, and your phone can play from it at home or anywhere else.
+PocketDeck for PC gets a Windows gaming PC ready to stream to [PocketDeck](https://github.com/Pocket-Deck-App/Pocket-Deck-Android) on your phone. It sets up the streaming engine ([Sunshine](https://github.com/SunshineStream/Sunshine)), finds the games you have installed and puts them on your phone with their covers, and pairs your phone with one scan. Then it waits quietly in the tray, and your phone can play from it at home or anywhere else.
 
 It's built to be light: pure Rust with a [Slint](https://slint.dev) interface drawn by the software renderer, about 30 MB of memory with the window open and less in the tray. It looks, sounds and sets up like PocketDeck on the phone, so the two feel like one product.
 
@@ -25,6 +25,16 @@ It's built to be light: pure Rust with a [Slint](https://slint.dev) interface dr
 - **Lives in the tray:** starts with Windows (optional) and keeps running when the window is closed. The window is only built while it's open.
 - **Same look and sound as the phone:** guided setup, accent colours, tile shapes and sizes, and the same console-style UI sounds.
 
+## Part of PocketDeck
+
+PocketDeck is three repositories in the [Pocket-Deck-App](https://github.com/Pocket-Deck-App) organization:
+
+| Repository | What it is |
+|---|---|
+| [Pocket-Deck-Android](https://github.com/Pocket-Deck-App/Pocket-Deck-Android) | The Android app: the game launcher and the streaming client. |
+| **Pocket-Deck-PC** (this one) | The Windows companion: sets up Sunshine, puts your games on the phone, pairs with one scan and hosts play from anywhere. |
+| [Pocket-Deck-Relay](https://github.com/Pocket-Deck-App/Pocket-Deck-Relay) | Deployment files for the relay that helps the phone and the PC find each other. |
+
 ## Requirements
 
 - Windows 10 or 11, x64
@@ -34,7 +44,7 @@ It's built to be light: pure Rust with a [Slint](https://slint.dev) interface dr
 
 ## Install
 
-Download `PocketDeck-<version>.exe` from [**Releases**](https://github.com/MohammedAbidNafi/Pocket-Deck-PC/releases/latest) and run it. It's a single program with nothing to install; setup walks you through the rest. A new release is published automatically whenever the version number changes on `main`.
+Download `PocketDeck-<version>.exe` from [**Releases**](https://github.com/Pocket-Deck-App/Pocket-Deck-PC/releases/latest) and run it. It's a single program with nothing to install; setup walks you through the rest. A new release is published automatically whenever the version number changes on `main`.
 
 **If your phone can't connect, check the PC:**
 
@@ -45,7 +55,7 @@ Download `PocketDeck-<version>.exe` from [**Releases**](https://github.com/Moham
 
 ## Release notes
 
-Full notes and downloads for every version are on the [Releases page](https://github.com/MohammedAbidNafi/Pocket-Deck-PC/releases).
+Full notes and downloads for every version are on the [Releases page](https://github.com/Pocket-Deck-App/Pocket-Deck-PC/releases).
 
 ### 0.3.0
 

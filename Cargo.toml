@@ -8,7 +8,7 @@ edition = "2024"
 rust-version = "1.91"
 license = "GPL-3.0-only"
 authors = ["Mohammed Abid Nafi"]
-repository = "https://github.com/MohammedAbidNafi/Pocket-Deck-PC"
+repository = "https://github.com/Pocket-Deck-App/Pocket-Deck-PC"
 
 [profile.release]
 opt-level = 3
